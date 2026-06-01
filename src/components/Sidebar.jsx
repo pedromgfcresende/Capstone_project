@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
-import { Search, ChevronRight, ChevronDown, Plus, X } from 'lucide-react'
+import { Search, ChevronRight, ChevronDown, Plus, X, PanelLeftClose } from 'lucide-react'
 
-const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSectors }, ref) {
+const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSectors, onCollapse, onHome }, ref) {
   useImperativeHandle(ref, () => ({
     triggerNewSector: () => setNewSectorName(''),
     triggerNewWorkspace: (sectorId) => {
@@ -67,14 +67,27 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
   return (
     <div className="w-[260px] h-screen flex flex-col shrink-0 select-none border-r border-rule" style={{ background: bg }}>
 
-      {/* Brand */}
-      <div className="px-4 pt-5 pb-4 border-b border-rule">
-        <div className="font-serif font-bold text-[16px] text-ink tracking-tight">
-          XAnge<span className="text-accent">.</span>
-        </div>
-        <div className="font-mono text-[9px] text-ink-mute uppercase tracking-[0.15em] mt-0.5">
-          Market Intelligence
-        </div>
+      {/* Brand + collapse */}
+      <div className="px-4 pt-5 pb-4 border-b border-rule flex items-start justify-between">
+        <button
+          onClick={onHome}
+          className="text-left bg-transparent border-0 cursor-pointer p-0 group"
+          title="Go to home"
+        >
+          <div className="font-serif font-bold text-[16px] text-ink tracking-tight group-hover:text-accent transition-colors">
+            XAnge<span className="text-accent">.</span>
+          </div>
+          <div className="font-mono text-[9px] text-ink-mute uppercase tracking-[0.15em] mt-0.5">
+            Market Intelligence
+          </div>
+        </button>
+        <button
+          onClick={onCollapse}
+          className="p-1 rounded bg-transparent border-0 cursor-pointer text-ink-mute hover:text-ink hover:bg-black/5 transition-colors mt-0.5"
+          title="Collapse sidebar"
+        >
+          <PanelLeftClose size={15} />
+        </button>
       </div>
 
       {/* Search + mode */}

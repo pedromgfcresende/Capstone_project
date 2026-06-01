@@ -1,22 +1,22 @@
 import { useState } from 'react'
+import OverviewTab from './tabs/OverviewTab'
 import PlayersTab from './tabs/PlayersTab'
 import ComparativeTab from './tabs/ComparativeTab'
-import CommentaryTab from './tabs/CommentaryTab'
 import DifferentiationTab from './tabs/DifferentiationTab'
 import SummaryTab from './tabs/SummaryTab'
 import SourcesTab from './tabs/SourcesTab'
 
 const TABS = [
+  { id: 'overview', label: 'Market Overview' },
   { id: 'players', label: 'Players' },
   { id: 'comparative', label: 'Comparative' },
-  { id: 'commentary', label: 'Market Commentary' },
   { id: 'differentiation', label: 'Differentiation' },
   { id: 'summary', label: 'Summary' },
   { id: 'sources', label: 'Sources' },
 ]
 
 export default function WorkspaceView({ workspace, sector, seedData }) {
-  const [activeTab, setActiveTab] = useState('players')
+  const [activeTab, setActiveTab] = useState('overview')
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -55,9 +55,9 @@ export default function WorkspaceView({ workspace, sector, seedData }) {
 
       {/* Tab content */}
       <div className="flex-1 flex flex-col min-h-0">
+        {activeTab === 'overview' && <OverviewTab workspace={workspace} sector={sector} />}
         {activeTab === 'players' && <PlayersTab workspace={workspace} sector={sector} />}
         {activeTab === 'comparative' && <ComparativeTab workspace={workspace} sector={sector} />}
-        {activeTab === 'commentary' && <CommentaryTab workspace={workspace} sector={sector} />}
         {activeTab === 'differentiation' && <DifferentiationTab workspace={workspace} sector={sector} />}
         {activeTab === 'summary' && <SummaryTab workspace={workspace} sector={sector} />}
         {activeTab === 'sources' && <SourcesTab workspace={workspace} sector={sector} />}

@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import Sidebar from './components/Sidebar'
+import { PanelLeftOpen } from 'lucide-react'
 import SectorCanvas from './components/SectorCanvas'
 import SeedScreen from './components/SeedScreen'
 import GeneratingState from './components/GeneratingState'
@@ -15,6 +16,7 @@ export default function App() {
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [workspaceStates, setWorkspaceStates] = useState({})
   const [conceptOpen, setConceptOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   const getSector = (id) => sectors.find(s => s.id === id)
   const getWorkspace = (sectorId, wsId) => {
@@ -46,7 +48,21 @@ export default function App() {
         Concept
       </button>
 
-      <Sidebar ref={sidebarRef} selected={selected} onSelect={setSelected} sectors={sectors} setSectors={setSectors} />
+      {/* Sidebar — slides in/out */}
+      <div style={{ width: sidebarOpen ? 264 : 0, transition: 'width 0.22s ease', overflow: 'hidden', flexShrink: 0 }}>
+        <Sidebar ref={sidebarRef} selected={selected} onSelect={setSelected} sectors={sectors} setSectors={setSectors} onCollapse={() => setSidebarOpen(false)} onHome={() => setSelected(null)} />
+      </div>
+
+      {/* Expand button — only when sidebar is hidden */}
+      {!sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="fixed top-4 left-4 z-50 p-1.5 rounded-md bg-bg-card border border-rule text-ink-mute hover:text-ink hover:border-ink-mute transition-all cursor-pointer"
+          title="Open sidebar"
+        >
+          <PanelLeftOpen size={15} />
+        </button>
+      )}
 
       <div className="flex-1 flex min-w-0">
 
@@ -111,6 +127,7 @@ export default function App() {
         )}
 
       </div>
+
     </div>
   )
 }

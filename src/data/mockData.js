@@ -9,6 +9,18 @@ export const sectors = [
         title: 'B2B Payments Infrastructure',
         focalCompany: 'Payflows',
         updatedAt: '2 min ago',
+        summary: 'The AP/AR automation layer is rapidly consolidating as CFOs demand unified payment workflows across invoicing, reconciliation and treasury. Payflows sits at the early-stage frontier of this consolidation, competing primarily with Pennylane on distribution and Spendesk on brand.',
+        keyInsight: 'Accountant-channel distribution is emerging as the decisive GTM advantage — whoever owns the accountant relationship owns the SMB CFO stack.',
+        priorityCompanies: [
+          { name: 'Payflows', reason: 'Focal company. Strong product velocity, entering enterprise pipeline. Next milestone is Series A close.' },
+          { name: 'Pennylane', reason: 'Accountant-channel strategy is the clearest distribution moat in the segment. Track closely for positioning reference.' },
+          { name: 'Finloup', reason: 'Pre-product but founding team credibility is very high (Qonto + McKinsey). Flag for Series A follow-up.' },
+        ],
+        openQuestions: [
+          'Can Payflows replicate Pennylane\'s accountant channel without the same brand recognition in the accounting community?',
+          'Is the AP/AR market large enough to support multiple winners at Series A-B, or will consolidation compress to 2-3 platforms?',
+          'How will PSD3 enforcement timelines affect the competitive moat of licensed payment institutions vs. unlicensed SaaS players?',
+        ],
         companies: [
           {
             id: 'co-a', name: 'Payflows', focal: true,
@@ -115,6 +127,34 @@ export const sectors = [
             segment: 'BaaS', primaryCustomer: 'Fintechs and corporate issuers',
             notes: 'Acquired by SocGen — no longer an independent player. Useful reference for how BaaS infrastructure gets absorbed into incumbent banks.',
           },
+          {
+            id: 'co-r', name: 'Karmen', focal: false,
+            founded: '2021', geography: 'France', fundRound: 'Seed', priority: 3,
+            description: 'Revenue-based financing platform for SaaS and e-commerce companies. Connects to accounting and payment data to underwrite non-dilutive growth capital.',
+            segment: 'Embedded Credit', primaryCustomer: 'SaaS founders and e-commerce operators',
+            notes: 'Early but interesting wedge into the CFO stack via financing. Worth monitoring as they build toward broader treasury tooling.',
+          },
+          {
+            id: 'co-t', name: 'Fygr', focal: false,
+            founded: '2022', geography: 'France', fundRound: 'Seed', priority: 3,
+            description: 'Cash flow forecasting tool built specifically for small businesses and accountants. Tight integration with French accounting software.',
+            segment: 'Treasury SaaS', primaryCustomer: 'Small businesses and their accountants',
+            notes: 'Narrow but defensible niche. If they expand to broader cash management, could be interesting at Series A.',
+          },
+          {
+            id: 'co-u', name: 'Finloup', focal: false,
+            founded: '2023', geography: 'France', fundRound: 'Pre-Seed', priority: 2,
+            description: 'AP automation and supplier payment orchestration for mid-market companies. Pre-product, strong founding team from Qonto and McKinsey.',
+            segment: 'B2B SaaS', primaryCustomer: 'CFOs at 100–500 person companies',
+            notes: 'Very early. Founding team credibility is high. Directly in XAnge sweet spot — flagged for follow-up at Series A.',
+          },
+          {
+            id: 'co-v', name: 'Subi', focal: false,
+            founded: '2023', geography: 'Spain', fundRound: 'Pre-Seed', priority: 2,
+            description: 'Subscription billing and revenue recognition automation for B2B SaaS companies. Targeting finance teams that outgrow Stripe billing.',
+            segment: 'B2B SaaS', primaryCustomer: 'Finance teams at SaaS companies',
+            notes: 'Very early-stage. Spanish market entry is underserved. Concept is solid but execution risk is high at this stage.',
+          },
         ],
       },
     ],
@@ -129,6 +169,17 @@ export const sectors = [
         title: 'Carbon Accounting',
         focalCompany: 'Sweep',
         updatedAt: '3 days ago',
+        summary: 'CSRD has turned carbon accounting from a differentiating feature into a compliance necessity, compressing margins and accelerating commoditisation. Sweep is well-positioned at the enterprise end, but the SMB tier is increasingly contested by simpler, lower-cost tools like Greenly.',
+        keyInsight: 'Data verification — not measurement — is the emerging moat. Companies that can attest to data quality will command premium pricing as regulatory scrutiny intensifies.',
+        priorityCompanies: [
+          { name: 'Sweep', reason: 'Focal company. Leading enterprise carbon platform in Europe. Watch Series C timeline and US expansion narrative.' },
+          { name: 'Greenly', reason: 'Closest comparable in France. SMB-focused but CSRD tailwind could push them upmarket. Monitor pricing moves.' },
+        ],
+        openQuestions: [
+          'Will mid-cap CSRD enforcement delay (pushed to FY2026) meaningfully reduce short-term pipeline for SMB carbon tools?',
+          'Can Sweep maintain its enterprise premium if large players like SAP or Salesforce build native carbon modules?',
+          'Is data verification a durable moat or will standardised APIs commoditise it within 18 months?',
+        ],
         companies: [
           {
             id: 'co-f', name: 'Sweep', focal: true,

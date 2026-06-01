@@ -1,8 +1,31 @@
-import { useState } from 'react'
-import { Plus, ArrowRight, FolderOpen, ChevronDown } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Plus, ArrowRight, FolderOpen, ChevronDown, Search, X } from 'lucide-react'
 
 export default function LandingPage({ sectors, onSelect, onCreateSector, onCreateWorkspace }) {
   const [pickingSector, setPickingSector] = useState(false)
+  const [query, setQuery] = useState('')
+
+  const searchResults = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return []
+    const results = []
+    for (const sector of sectors) {
+      if (sector.label.toLowerCase().includes(q)) {
+        results.push({ type: 'sector', id: sector.id, label: sector.label, sub: `${sector.workspaces.length} workspace${sector.workspaces.length !== 1 ? 's' : ''}` })
+      }
+      for (const ws of sector.workspaces) {
+        if (ws.title.toLowerCase().includes(q) || ws.focalCompany?.toLowerCase().includes(q)) {
+          results.push({ type: 'workspace', id: ws.id, sectorId: sector.id, label: ws.title, sub: sector.label })
+        }
+        for (const co of (ws.companies || [])) {
+          if (co.name.toLowerCase().includes(q) || co.segment?.toLowerCase().includes(q) || co.geography?.toLowerCase().includes(q)) {
+            results.push({ type: 'company', id: co.id, sectorId: sector.id, wsId: ws.id, label: co.name, sub: `${ws.title} · ${sector.label}` })
+          }
+        }
+      }
+    }
+    return results.slice(0, 8)
+  }, [query, sectors])
 
   const handlePickSector = (sectorId) => {
     setPickingSector(false)
@@ -36,6 +59,50 @@ export default function LandingPage({ sectors, onSelect, onCreateSector, onCreat
         <p className="font-sans text-[13.5px] text-ink-mute leading-relaxed mb-10">
           Map a new market or pick up where you left off.
         </p>
+
+        {/* Global search */}
+        <div className="relative mb-4">
+          <div className="flex items-center gap-2.5 px-4 py-3 bg-white border border-rule rounded-lg focus-within:border-ink-mute transition-colors">
+            <Search size={14} className="text-ink-mute shrink-0" />
+            <input
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search sectors, workspaces, companies…"
+              className="flex-1 bg-transparent border-0 outline-none font-sans text-[13px] text-ink placeholder:text-ink-mute"
+            />
+            {query && (
+              <button onClick={() => setQuery('')} className="bg-transparent border-0 cursor-pointer p-0 text-ink-mute hover:text-ink transition-colors">
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {searchResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-rule rounded-lg shadow-lg overflow-hidden z-20">
+              {searchResults.map((r, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setQuery(''); onSelect({ type: r.type === 'company' ? 'workspace' : r.type, id: r.type === 'company' ? r.wsId : r.id, sectorId: r.sectorId }) }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg border-0 bg-transparent cursor-pointer text-left transition-colors border-b border-rule last:border-b-0"
+                >
+                  <span className="font-mono text-[8px] uppercase tracking-[0.1em] text-ink-mute w-14 shrink-0">{r.type}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-sans text-[12.5px] font-medium text-ink truncate">{r.label}</div>
+                    <div className="font-sans text-[11px] text-ink-mute truncate">{r.sub}</div>
+                  </div>
+                  <ArrowRight size={12} className="text-ink-mute shrink-0" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {query && searchResults.length === 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-rule rounded-lg shadow-lg px-4 py-3 z-20">
+              <span className="font-sans text-[12.5px] text-ink-mute italic">No results for "{query}"</span>
+            </div>
+          )}
+        </div>
 
         {/* Primary actions */}
         <div className="flex flex-col gap-3 mb-10">
