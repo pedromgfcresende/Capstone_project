@@ -6,11 +6,27 @@ const COLORS = {
   default: { bg: '#1a1a1a', border: '#1a1a1a', text: '#fff' },
 }
 
-const DEFAULT_POSITIONS = [
-  { x: 68, y: 22 }, { x: 72, y: 48 }, { x: 58, y: 35 },
-  { x: 35, y: 62 }, { x: 20, y: 40 }, { x: 45, y: 75 },
-  { x: 80, y: 70 }, { x: 25, y: 20 },
-]
+// Deterministically spread N companies across the map on a jittered grid so
+// points never stack, whatever the company count.
+function spreadPositions(n) {
+  if (n === 0) return []
+  const margin = 12
+  const cols = Math.ceil(Math.sqrt(n))
+  const rows = Math.ceil(n / cols)
+  const cellW = (100 - 2 * margin) / cols
+  const cellH = (100 - 2 * margin) / rows
+  const rand = (seed) => { const v = Math.sin(seed * 99991) * 10000; return v - Math.floor(v) }
+  return Array.from({ length: n }, (_, i) => {
+    const col = i % cols
+    const row = Math.floor(i / cols)
+    const jx = (rand(i + 1) - 0.5) * cellW * 0.45
+    const jy = (rand(i + 137) - 0.5) * cellH * 0.45
+    return {
+      x: Math.round(margin + (col + 0.5) * cellW + jx),
+      y: Math.round(margin + (row + 0.5) * cellH + jy),
+    }
+  })
+}
 
 const FUND_ROUND_SIZE = {
   'Pre-seed': 8, 'Seed': 9, 'Series A': 11,
@@ -182,15 +198,17 @@ export default function ComparativeTab({ workspace }) {
     setTimeout(() => { setSuggesting(false); setAxisOpen(true) }, 800)
   }
 
-  const [positions, setPositions] = useState(() =>
-    (workspace.companies || []).map((co, i) => ({
+  const [positions, setPositions] = useState(() => {
+    const cos = workspace.companies || []
+    const spread = spreadPositions(cos.length)
+    return cos.map((co, i) => ({
       id: co.id, name: co.name, focal: co.focal || false,
       priority: co.priority || null, fundRound: co.fundRound || '',
       founded: co.founded || '',
-      x: DEFAULT_POSITIONS[i % DEFAULT_POSITIONS.length].x,
-      y: DEFAULT_POSITIONS[i % DEFAULT_POSITIONS.length].y,
+      x: spread[i].x,
+      y: spread[i].y,
     }))
-  )
+  })
 
   const [tooltip, setTooltip] = useState(null)
 

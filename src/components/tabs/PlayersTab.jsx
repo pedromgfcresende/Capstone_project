@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
-import { ChevronRight, ChevronDown, Plus, Sparkles, X, Trash2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Sparkles, X, Trash2, NotebookPen } from 'lucide-react'
+import CompanyProfile from '../CompanyProfile'
 
 const BUBBLE_COLORS = {
   1: { active: '#e8a09a', inactive: '#f5e0de' },
@@ -85,7 +86,7 @@ function InlineCell({ value, onChange }) {
   )
 }
 
-function PlayerRow({ player, customColumns, onUpdate, onRemove }) {
+function PlayerRow({ player, customColumns, onUpdate, onRemove, onOpenProfile }) {
   const [expanded, setExpanded] = useState(false)
   const [enhancing, setEnhancing] = useState(false)
   const [extraFields, setExtraFields] = useState(player.extraFields || [])
@@ -205,14 +206,23 @@ function PlayerRow({ player, customColumns, onUpdate, onRemove }) {
               Add field
             </button>
           </div>
-          <button
-            onClick={handleEnhance}
-            disabled={enhancing}
-            className="shrink-0 flex items-center gap-1.5 font-sans text-[11.5px] font-medium px-3 py-2 rounded-md border border-rule bg-white text-ink-soft hover:text-ink hover:border-ink-mute transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap mt-1"
-          >
-            <Sparkles size={11} className="text-accent" />
-            {enhancing ? 'Enhancing…' : 'AI enhance'}
-          </button>
+          <div className="shrink-0 flex flex-col gap-2 mt-1">
+            <button
+              onClick={onOpenProfile}
+              className="flex items-center gap-1.5 font-sans text-[11.5px] font-medium px-3 py-2 rounded-md border border-rule bg-white text-ink-soft hover:text-ink hover:border-ink-mute transition-all cursor-pointer whitespace-nowrap"
+            >
+              <NotebookPen size={11} className="text-accent" />
+              Notes &amp; contacts
+            </button>
+            <button
+              onClick={handleEnhance}
+              disabled={enhancing}
+              className="flex items-center gap-1.5 font-sans text-[11.5px] font-medium px-3 py-2 rounded-md border border-rule bg-white text-ink-soft hover:text-ink hover:border-ink-mute transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap"
+            >
+              <Sparkles size={11} className="text-accent" />
+              {enhancing ? 'Enhancing…' : 'AI enhance'}
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -267,6 +277,7 @@ export default function PlayersTab({ workspace }) {
     }))
   )
   const [customColumns, setCustomColumns] = useState([])
+  const [profileCompany, setProfileCompany] = useState(null)
 
   const sorted = [...players].sort((a, b) => {
     if (!a.priority && !b.priority) return 0
@@ -341,6 +352,7 @@ export default function PlayersTab({ workspace }) {
                 customColumns={customColumns}
                 onUpdate={changes => update(player.id, changes)}
                 onRemove={() => remove(player.id)}
+                onOpenProfile={() => setProfileCompany(player)}
               />
             </div>
           ))
@@ -354,6 +366,10 @@ export default function PlayersTab({ workspace }) {
           Add company
         </button>
       </div>
+
+      {profileCompany && (
+        <CompanyProfile company={profileCompany} onClose={() => setProfileCompany(null)} />
+      )}
     </div>
   )
 }

@@ -1,93 +1,7 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Zap, Shield, ArrowUpRight } from 'lucide-react'
-
-// ── Mock data keyed by workspace id ──────────────────────────────────────────
-const MOCK = {
-  'ws-1': {
-    thesis: 'The AP/AR automation layer is rapidly consolidating as CFOs demand unified payment workflows across invoicing, reconciliation and treasury. Payflows sits at the early-stage frontier of this consolidation, competing primarily with Pennylane on distribution and Spendesk on brand.',
-    tam: '$8.2B', tamFlag: true,
-    sam: '$2.1B', samFlag: false,
-    som: '$420M', somFlag: false,
-    cagr: '18% CAGR',
-    maturity: 'Early Majority',
-    dataDate: 'May 2025',
-    tailwinds: [
-      { title: 'Open banking mandates (PSD2 → PSD3)', detail: 'EU open banking regulation is lowering infrastructure cost for new entrants while forcing banks to open APIs — accelerating fintech distribution.' },
-      { title: 'CFO software consolidation', detail: 'Finance teams are consolidating spend management, AP/AR, and treasury into unified platforms. Point solutions with strong integration stories win.' },
-      { title: 'AI-native automation displacing ERP', detail: 'Gartner, Forrester and IDC all flag AP/AR automation as a top-5 CFO priority for 2024–25. AI-native tools are replacing rule-based reconciliation.' },
-    ],
-    headwinds: [
-      { title: 'Compliance cost as a barrier', detail: 'PSD3 and AML requirements raise the cost of operating as a licensed payment institution, compressing margins for early-stage players.' },
-      { title: 'Incumbent bank counter-moves', detail: 'Tier-1 banks are embedding payment automation into existing corporate banking relationships, leveraging switching costs and pricing leverage.' },
-    ],
-    whyNow: [
-      { title: 'PSD3 enforcement creating urgency', detail: 'Trilogue completed Sept 2024 — enforcement expected 2026. Finance teams are actively evaluating infrastructure now to avoid last-minute compliance risk.' },
-      { title: 'Post-COVID finance digitisation wave', detail: '60% of European CFOs plan to replace at least one ERP module with a point solution by 2026 (FT / Accenture survey, Feb 2025).' },
-      { title: 'ERP replacement cycle at mid-market', detail: 'SAP and Oracle ERP refresh cycles are creating natural switching moments for mid-market CFOs — the primary ICP for AP/AR automation tools.' },
-    ],
-    recentMA: [
-      { date: 'Jun 2024', event: 'Société Générale acquires Treezor', note: 'Incumbent absorption of BaaS infrastructure — narrows the independent BaaS market.' },
-      { date: 'Oct 2023', event: 'Pleo acquires Tiller Systems', note: 'Horizontal expansion into restaurant/retail verticals — spend management broadening.' },
-    ],
-    newEntrants: ['Finloup (2023, FR)', 'Subi (2023, ES)', 'Karmen (2021, FR)'],
-    regulatory: [
-      { region: 'EU', date: 'Sep 2024', label: 'PSD3 enters trilogue', impact: 'High', note: 'Broadens open banking obligations and tightens liability rules. Enforcement expected 2026.' },
-      { region: 'EU', date: 'Mar 2025', label: 'DORA goes live for financial institutions', impact: 'Medium', note: 'Digital operational resilience requirements — affects fintechs processing payments above thresholds.' },
-      { region: 'EU', date: 'Jan 2025', label: 'AML Package 6 adopted', impact: 'Medium', note: 'Stricter KYB and transaction monitoring rules — raises compliance cost for embedded finance players.' },
-    ],
-    adoptionStage: 'Early Majority',
-    adoptionEvidence: 'Over 400,000 SMBs in France now use a dedicated fintech for payments or expense management (Banque de France, 2024). Google Trends for "AP automation" and "expense management software" show sustained upward slope across the EU since 2022.',
-    exits: [
-      { type: 'Strategic M&A', likelihood: 'High', acquirers: 'SAP, Sage, Oracle, Major banks (BNP, SocGen)', multiples: '6–10× ARR', comparables: 'Treezor / SocGen (2024), Divvy / BILL ($2.5B, 2021)' },
-      { type: 'PE Buyout', likelihood: 'Medium', acquirers: 'Vista, Thoma Bravo, Hg Capital', multiples: '5–8× ARR', comparables: 'Payhawk at $1B (growth equity, 2024)' },
-      { type: 'IPO', likelihood: 'Low (near-term)', acquirers: '—', multiples: '8–15× ARR at scale', comparables: 'Toast (US, 2021), Brex (likely 2025–26)' },
-    ],
-  },
-  'ws-2': {
-    thesis: 'CSRD has turned carbon accounting from a differentiating feature into a compliance necessity, compressing margins and accelerating commoditisation. Sweep is well-positioned at the enterprise end, but the SMB tier is increasingly contested.',
-    tam: '$3.4B', tamFlag: true,
-    sam: '$900M', samFlag: false,
-    som: '$180M', somFlag: false,
-    cagr: '24% CAGR',
-    maturity: 'Early Adopters',
-    dataDate: 'Apr 2025',
-    tailwinds: [
-      { title: 'CSRD mandatory reporting for large-caps', detail: 'CSRD enforcement for large EU companies began FY2024. Mid-caps follow in FY2026. Creates immediate pipeline.' },
-      { title: 'Investor ESG pressure institutionalised', detail: 'SFDR and EU taxonomy mean LPs are requiring portfolio-level carbon visibility — fund managers are pushing this down to portfolio companies.' },
-      { title: 'Data verification as premium layer', detail: 'Bloomberg NEF: data verification is now the primary switching cost in enterprise carbon platforms — creates upsell and pricing power.' },
-    ],
-    headwinds: [
-      { title: 'Commoditisation of measurement tools', detail: 'Basic carbon measurement is becoming table-stakes. SMB tools are proliferating and driving down ACV across the lower segment.' },
-      { title: 'CSRD mid-cap delay softens near-term pipeline', detail: 'EC pushed mid-cap enforcement to FY2026 — reduces urgency for the SMB tier that many platforms depend on for volume.' },
-    ],
-    whyNow: [
-      { title: 'CSRD enforcement now live for large-caps', detail: 'FY2024 reporting obligations are active — enterprise procurement cycles are moving now.' },
-      { title: 'SFDR pressure cascades down supply chains', detail: 'Large-cap CSRD requirements cascade to Scope 3 — meaning SMB suppliers face carbon data requests from their enterprise customers.' },
-    ],
-    recentMA: [
-      { date: 'Feb 2024', event: 'Greenly raises €31M Series B', note: 'SMB-focused play gaining traction with CSRD-readiness messaging.' },
-    ],
-    newEntrants: ['Carbonfact (2021, FR)', 'Metrio (2022, EU)'],
-    regulatory: [
-      { region: 'EU', date: 'Mar 2025', label: 'EC confirms CSRD mid-cap delay to FY2026', impact: 'Medium', note: 'Short-term pipeline softens for SMB tools; enterprise demand unaffected.' },
-      { region: 'EU', date: 'Jan 2024', label: 'SFDR Level 2 RTS in force', impact: 'High', note: 'Fund managers must disclose portfolio-level sustainability data — drives demand upstream.' },
-    ],
-    adoptionStage: 'Early Adopters',
-    adoptionEvidence: 'Carbon accounting software penetration among CSRD-obligated large-caps is estimated at 35–40% (PwC ESG survey, 2024). Google Trends for "CSRD software" and "carbon accounting platform" show sharp acceleration from Q3 2023.',
-    exits: [
-      { type: 'Strategic M&A', likelihood: 'High', acquirers: 'SAP, Salesforce, IBM, Big 4 consulting arms', multiples: '8–14× ARR', comparables: 'Plan A / undisclosed (2024), Persefoni fundraise signals exit readiness' },
-      { type: 'PE Buyout', likelihood: 'Low', acquirers: 'Specialist ESG-focused funds', multiples: '6–10× ARR', comparables: 'Limited precedent at scale in EU' },
-      { type: 'IPO', likelihood: 'Low (near-term)', acquirers: '—', multiples: '10–18× ARR at scale', comparables: 'No direct public comp yet in EU carbon SaaS' },
-    ],
-  },
-}
-
-const FALLBACK = {
-  thesis: '', tam: '', sam: '', som: '', cagr: '', maturity: '', dataDate: '',
-  tailwinds: [], headwinds: [], whyNow: [], recentMA: [], newEntrants: [],
-  regulatory: [], adoptionStage: '', adoptionEvidence: '', exits: [],
-  tamFlag: false, samFlag: false, somFlag: false,
-}
+import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Zap, ArrowUpRight } from 'lucide-react'
+import { segmentOverview, FALLBACK_OVERVIEW } from '../../data/segmentOverview'
+import { VerifyDot, VerifyLegend, useVerifyMap } from '../VerifyDot'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -97,6 +11,7 @@ function SectionLabel({ children }) {
 
 function SignalCard({ icon: Icon, iconColor, label, items }) {
   const [openIdx, setOpenIdx] = useState(null)
+  const verify = useVerifyMap()
   return (
     <div className="bg-white border border-rule rounded-lg overflow-hidden flex flex-col">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-rule">
@@ -109,15 +24,18 @@ function SignalCard({ icon: Icon, iconColor, label, items }) {
         <ul className="flex flex-col divide-y divide-rule">
           {items.map((item, i) => (
             <li key={i}>
-              <button
-                onClick={() => setOpenIdx(openIdx === i ? null : i)}
-                className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left bg-transparent border-0 cursor-pointer hover:bg-bg transition-colors"
-              >
-                <span className="font-sans text-[12.5px] text-ink leading-snug flex-1">{item.title}</span>
-                {openIdx === i ? <ChevronUp size={11} className="text-ink-mute shrink-0" /> : <ChevronDown size={11} className="text-ink-mute shrink-0" />}
-              </button>
+              <div className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-bg transition-colors">
+                <VerifyDot status={verify.get(i)} onClick={() => verify.cycle(i)} />
+                <button
+                  onClick={() => setOpenIdx(openIdx === i ? null : i)}
+                  className="flex-1 flex items-center justify-between gap-3 text-left bg-transparent border-0 cursor-pointer p-0"
+                >
+                  <span className="font-sans text-[12.5px] text-ink leading-snug flex-1">{item.title}</span>
+                  {openIdx === i ? <ChevronUp size={11} className="text-ink-mute shrink-0" /> : <ChevronDown size={11} className="text-ink-mute shrink-0" />}
+                </button>
+              </div>
               {openIdx === i && (
-                <div className="px-4 pb-3">
+                <div className="px-4 pb-3 pl-[34px]">
                   <p className="font-sans text-[12px] text-ink-soft leading-relaxed">{item.detail}</p>
                 </div>
               )}
@@ -147,8 +65,11 @@ const STAGE_POSITION = { 'Early Adopters': 15, 'Early Majority': 42, 'Late Major
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function OverviewTab({ workspace }) {
-  const d = MOCK[workspace.id] || FALLBACK
+  const d = segmentOverview[workspace.id] || FALLBACK_OVERVIEW
   const [expandedExit, setExpandedExit] = useState(null)
+  const sizeVerify = useVerifyMap()
+  const regVerify = useVerifyMap()
+  const exitVerify = useVerifyMap()
 
   const pos = STAGE_POSITION[d.adoptionStage] ?? 30
 
@@ -182,7 +103,10 @@ export default function OverviewTab({ workspace }) {
             ].map(({ key, sub, value, flag, flagLabel }) => (
               <div key={key} className="bg-white border border-rule rounded-lg p-5 flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">{key}</span>
+                  <div className="flex items-center gap-2">
+                    <VerifyDot status={sizeVerify.get(key)} onClick={() => sizeVerify.cycle(key)} />
+                    <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">{key}</span>
+                  </div>
                   {flag && (
                     <span className="font-mono text-[8px] uppercase tracking-[0.06em] px-1.5 py-0.5 rounded" style={{ background: '#d4edda', color: '#2d6a3f' }}>✓ Venture-scale</span>
                   )}
@@ -197,7 +121,10 @@ export default function OverviewTab({ workspace }) {
 
         {/* ── 3. Structural Signals ── */}
         <div className="flex flex-col gap-3">
-          <SectionLabel>Structural Signals</SectionLabel>
+          <div className="flex items-center justify-between">
+            <SectionLabel>Structural Signals</SectionLabel>
+            <VerifyLegend />
+          </div>
           <div className="grid grid-cols-3 gap-3">
             <SignalCard icon={TrendingUp} iconColor="#2d6a3f" label="Tailwinds" items={d.tailwinds} />
             <SignalCard icon={TrendingDown} iconColor="#c04a22" label="Headwinds" items={d.headwinds} />
@@ -259,7 +186,10 @@ export default function OverviewTab({ workspace }) {
                       <span className="font-mono text-[9px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded text-center" style={{ background: '#e8f0fe', color: '#2a5fd4' }}>{r.region}</span>
                       <span className="font-mono text-[10px] text-ink-mute pt-0.5">{r.date}</span>
                       <div>
-                        <div className="font-sans text-[12.5px] font-medium text-ink">{r.label}</div>
+                        <div className="flex items-center gap-2">
+                          <VerifyDot status={regVerify.get(i)} onClick={() => regVerify.cycle(i)} />
+                          <span className="font-sans text-[12.5px] font-medium text-ink">{r.label}</span>
+                        </div>
                         <div className="font-sans text-[11.5px] text-ink-soft leading-snug mt-0.5">{r.note}</div>
                       </div>
                       <span className="font-mono text-[8.5px] uppercase tracking-[0.06em] px-2 py-0.5 rounded h-fit" style={{ background: ic.bg, color: ic.text }}>{r.impact}</span>
@@ -308,19 +238,22 @@ export default function OverviewTab({ workspace }) {
               const open = expandedExit === i
               return (
                 <div key={i} className="border-b border-rule last:border-b-0">
-                  <button
+                  <div
                     onClick={() => setExpandedExit(open ? null : i)}
-                    className="w-full grid items-center px-4 py-3.5 text-left bg-transparent border-0 cursor-pointer hover:bg-bg transition-colors gap-3"
+                    className="w-full grid items-center px-4 py-3.5 text-left cursor-pointer hover:bg-bg transition-colors gap-3"
                     style={{ gridTemplateColumns: '160px 90px 1fr 120px' }}
                   >
-                    <span className="font-sans text-[12.5px] font-medium text-ink">{ex.type}</span>
+                    <div className="flex items-center gap-2">
+                      <VerifyDot status={exitVerify.get(i)} onClick={() => exitVerify.cycle(i)} />
+                      <span className="font-sans text-[12.5px] font-medium text-ink">{ex.type}</span>
+                    </div>
                     <span className="font-mono text-[8.5px] uppercase tracking-[0.06em] px-2 py-0.5 rounded w-fit" style={{ background: lc.bg, color: lc.text }}>{ex.likelihood}</span>
                     <span className="font-sans text-[12px] text-ink-soft truncate">{ex.acquirers}</span>
                     <div className="flex items-center justify-between">
                       <span className="font-mono text-[11px] text-ink">{ex.multiples}</span>
                       {open ? <ChevronUp size={11} className="text-ink-mute" /> : <ChevronDown size={11} className="text-ink-mute" />}
                     </div>
-                  </button>
+                  </div>
                   {open && (
                     <div className="px-4 pb-4 pt-1 border-t border-rule bg-bg">
                       <div className="flex items-start gap-2">
