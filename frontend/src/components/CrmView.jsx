@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Search, X, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react'
-import { getCrmCompanies, getCrmFacets } from '../api/client'
+import { Search, X, ExternalLink, ChevronLeft, ChevronRight, Sparkles, RefreshCw } from 'lucide-react'
+import { getCrmCompanies, getCrmFacets, analyseCrmCompany } from '../api/client'
 
 const STATUS_COLORS = {
   hot: { bg: '#d4edda', text: '#2d6a3f', label: 'Hot' },
@@ -11,7 +11,7 @@ const STATUS_COLORS = {
 const PAGE = 25
 const fmtEur = (n) => (n == null ? '—' : n >= 1e6 ? `€${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `€${Math.round(n / 1e3)}k` : `€${n}`)
 
-export default function CrmView() {
+export default function CrmView({ onAnalysed }) {
   const [facets, setFacets] = useState(null)
   const [data, setData] = useState({ items: [], total: 0 })
   const [loading, setLoading] = useState(true)
@@ -19,6 +19,20 @@ export default function CrmView() {
   const [country, setCountry] = useState('')
   const [q, setQ] = useState('')
   const [offset, setOffset] = useState(0)
+  const [analysingId, setAnalysingId] = useState(null)
+  const [analyseError, setAnalyseError] = useState(null)
+
+  const analyse = async (id) => {
+    setAnalysingId(id); setAnalyseError(null)
+    try {
+      const r = await analyseCrmCompany(id)
+      onAnalysed?.(r.sector)
+    } catch (e) {
+      setAnalyseError(e.message)
+    } finally {
+      setAnalysingId(null)
+    }
+  }
 
   useEffect(() => { getCrmFacets().then(setFacets).catch(() => {}) }, [])
 
@@ -93,13 +107,20 @@ export default function CrmView() {
         </div>
       </div>
 
+      {(analysingId || analyseError) && (
+        <div className="px-8 py-2 border-b border-rule bg-bg-card shrink-0 font-sans text-[12px]"
+          style={{ color: analyseError ? '#b8401f' : '#8a8580' }}>
+          {analyseError ? `Analyse failed: ${analyseError}` : 'AI market research running (suggest sector + segment, then web research)… ~1 min.'}
+        </div>
+      )}
+
       {/* Table */}
       <div className="flex-1 overflow-y-auto">
         <table className="w-full border-collapse">
           <thead className="sticky top-0 bg-bg z-10">
             <tr className="border-b border-rule">
-              {['Company', 'Status', 'Country', 'Stage', 'Funding', 'Owner'].map(h => (
-                <th key={h} className="text-left font-mono text-[8.5px] uppercase tracking-[0.1em] text-ink-mute px-4 py-2.5 font-medium">{h}</th>
+              {['Company', 'Status', 'Country', 'Stage', 'Funding', 'Owner', ''].map((h, i) => (
+                <th key={i} className="text-left font-mono text-[8.5px] uppercase tracking-[0.1em] text-ink-mute px-4 py-2.5 font-medium">{h}</th>
               ))}
             </tr>
           </thead>
@@ -126,12 +147,22 @@ export default function CrmView() {
                   <td className="px-4 py-2.5 font-sans text-[12px] text-ink-soft">{c.country || '—'}</td>
                   <td className="px-4 py-2.5 font-sans text-[12px] text-ink-soft">{c.investmentStage || '—'}</td>
                   <td className="px-4 py-2.5 font-mono text-[11.5px] text-ink-soft">{fmtEur(c.totalFundingEur)}</td>
-                  <td className="px-4 py-2.5 font-sans text-[11px] text-ink-mute truncate max-w-[180px]">{(c.owner || '').split('<')[0].trim() || '—'}</td>
+                  <td className="px-4 py-2.5 font-sans text-[11px] text-ink-mute truncate max-w-[160px]">{(c.owner || '').split('<')[0].trim() || '—'}</td>
+                  <td className="px-4 py-2.5">
+                    <button
+                      onClick={() => analyse(c.id)}
+                      disabled={analysingId !== null}
+                      title="AI analyse: suggest sector + segment and research competitors"
+                      className="flex items-center gap-1 font-mono text-[8.5px] uppercase tracking-[0.06em] px-2 py-1 rounded border border-rule bg-white text-ink-soft hover:text-ink hover:border-ink-mute cursor-pointer transition-all disabled:opacity-40 whitespace-nowrap"
+                    >
+                      {analysingId === c.id ? <><RefreshCw size={10} className="animate-spin" /> Analysing…</> : <><Sparkles size={10} /> Analyse</>}
+                    </button>
+                  </td>
                 </tr>
               )
             })}
             {!loading && data.items.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-10 text-center font-sans text-[13px] text-ink-mute italic">No companies match these filters.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-10 text-center font-sans text-[13px] text-ink-mute italic">No companies match these filters.</td></tr>
             )}
           </tbody>
         </table>

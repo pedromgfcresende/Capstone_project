@@ -85,7 +85,7 @@ export default function App() {
           )
         )}
 
-        {selected?.type === 'crm' && <CrmView />}
+        {selected?.type === 'crm' && <CrmView onAnalysed={handleSectorCreated} />}
 
         {selected?.type === 'newSector' && (
           <SeedScreen

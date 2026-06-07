@@ -31,8 +31,10 @@ export const patchSegment = (id, body) => send('PATCH', `/segments/${id}`, body)
 export const synthesizeSector = (id) => send('POST', `/sectors/${id}/synthesize`)
 export const askSector = (id, question) => send('POST', `/sectors/${id}/ask`, { question })
 export const patchSector = (id, body) => send('PATCH', `/sectors/${id}`, body)
+export const enrichSector = (id, opts = {}) => send('POST', `/sectors/${id}/enrich`, opts)
 
 export const getCrmFacets = () => get('/crm/facets')
+export const analyseCrmCompany = (id) => send('POST', `/crm/companies/${id}/analyse`)
 
 export const patchVerification = ({ entityType, entityId, claimKey, status }) =>
   send('PATCH', '/verifications', { entityType, entityId, claimKey, status })

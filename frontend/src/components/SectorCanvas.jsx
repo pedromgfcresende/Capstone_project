@@ -3,7 +3,7 @@ import { ArrowRight, Search, X, Sparkles, ChevronDown, ChevronUp, Send, Target, 
 import { segmentOverview, FALLBACK_OVERVIEW } from '../data/segmentOverview'
 import CompanyProfile from './CompanyProfile'
 import { VerifyDot, VerifyLegend, useVerifyMap } from './VerifyDot'
-import { synthesizeSector, askSector, patchSector } from '../api/client'
+import { synthesizeSector, askSector, patchSector, enrichSector } from '../api/client'
 
 const SIGNAL_COLORS = {
   'Funding':    { bg: '#d4edda', text: '#2d6a3f' },
@@ -121,8 +121,11 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
   const [resynth, setResynth] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
+  const [enriching, setEnriching] = useState(false)
+  const [enrichMsg, setEnrichMsg] = useState('')
   const [profileCompany, setProfileCompany] = useState(null)
   const signalVerify = useVerifyMap()
+  const aiVerify = useVerifyMap()
 
   const workspaces = sector?.workspaces || []
 
@@ -295,6 +298,19 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
     }
   }
 
+  const handleEnrich = async () => {
+    setEnriching(true); setEnrichMsg('')
+    try {
+      const r = await enrichSector(sector.id)
+      onSectorUpdated?.(r.sector)
+      setEnrichMsg(`+${r.enrichment.createdCount} AI-found competitor${r.enrichment.createdCount === 1 ? '' : 's'}`)
+    } catch (e) {
+      setEnrichMsg(`Enrichment failed: ${e.message}`)
+    } finally {
+      setEnriching(false)
+    }
+  }
+
   if (!sector) return (
     <div className="flex-1 flex items-center justify-center text-ink-mute font-sans text-[13px]">Select a sector from the sidebar</div>
   )
@@ -311,6 +327,18 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
           <h1 className="font-serif text-[20px] font-semibold tracking-tight text-ink">{sector.label}</h1>
         </div>
         <div className="flex items-center gap-2">
+          {enrichMsg && <span className="font-mono text-[9px] text-ink-mute">{enrichMsg}</span>}
+          <button
+            onClick={handleEnrich}
+            disabled={enriching}
+            title="AI market research — find competitors not in our CRM (web + LLM)"
+            className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.1em] px-3 py-1.5 rounded transition-all cursor-pointer disabled:opacity-50 border-0"
+            style={{ background: enriching ? '#d8d2c5' : '#1a1a1a', color: enriching ? '#8a8580' : '#fff' }}
+            onMouseEnter={e => { if (!enriching) e.currentTarget.style.background = '#e85d3b' }}
+            onMouseLeave={e => { if (!enriching) e.currentTarget.style.background = '#1a1a1a' }}
+          >
+            {enriching ? <><RefreshCw size={11} className="animate-spin" /> Researching…</> : <><Sparkles size={11} /> Find competitors</>}
+          </button>
           {saveMsg && <span className="font-mono text-[9px] text-ink-mute">{saveMsg}</span>}
           <button
             onClick={handleSave}
@@ -394,6 +422,19 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
                   <span className="font-serif text-[22px] font-semibold text-ink">{totalTam}</span>
                   <span className="font-sans text-[11.5px] text-ink-mute">combined TAM</span>
                 </div>
+                {sector?.stats && (
+                  <>
+                    <div className="w-px h-5 bg-rule" />
+                    <div className="flex items-baseline gap-1.5" title="AI-discovered competitors not (yet) in the CRM">
+                      <span className="font-serif text-[22px] font-semibold" style={{ color: '#5a3d9a' }}>{sector.stats.aiCompanies}</span>
+                      <span className="font-sans text-[11.5px] text-ink-mute">AI-found</span>
+                    </div>
+                    <div className="flex items-baseline gap-1.5" title="Competitors already present in XAnge's CRM">
+                      <span className="font-serif text-[22px] font-semibold" style={{ color: '#2d6a3f' }}>{sector.stats.inCrm}</span>
+                      <span className="font-sans text-[11.5px] text-ink-mute">in CRM</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* stage distribution bar */}
@@ -597,6 +638,51 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
                     </table>
                   </div>
                   <div className="mt-2 font-mono text-[8px] uppercase tracking-[0.08em] text-ink-mute">★ focal · number = competitive tier (1 = most serious) · • present</div>
+                </div>
+              )
+            })()}
+
+            {/* ── AI-discovered competitors (M2 enrichment) ── */}
+            {(() => {
+              const ai = (sector?.companies || []).filter(c => c.origin === 'ai')
+              if (ai.length === 0) return null
+              return (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <SectionHeader icon={Sparkles} label="AI-discovered competitors" count={ai.length} />
+                    <VerifyLegend />
+                  </div>
+                  <div className="font-sans text-[11.5px] text-ink-mute mb-2">
+                    Found by AI market research (web + LLM) — not from the uploaded CSV. Verify before use.
+                  </div>
+                  <div className="bg-white border border-rule rounded-lg overflow-hidden divide-y divide-rule">
+                    {ai.map(c => (
+                      <div key={c.id} className="flex items-start gap-3 px-4 py-3 hover:bg-bg transition-colors">
+                        <div className="mt-[3px]"><VerifyDot status={aiVerify.get(c.id)} onClick={() => aiVerify.cycle(c.id)} /></div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-sans text-[13px] font-semibold text-ink">{c.name}</span>
+                            {c.inCrm
+                              ? <span className="font-mono text-[8px] uppercase tracking-[0.05em] px-1.5 py-0.5 rounded" style={{ background: '#d4edda', color: '#2d6a3f' }}>in CRM</span>
+                              : <span className="font-mono text-[8px] uppercase tracking-[0.05em] px-1.5 py-0.5 rounded" style={{ background: '#e8e0f8', color: '#5a3d9a' }}>net-new</span>}
+                            {c.segments?.[0]?.title && <span className="font-mono text-[8px] uppercase tracking-[0.05em] text-ink-mute bg-bg px-1.5 py-0.5 rounded border border-rule">{c.segments[0].title}</span>}
+                            {c.confidence != null && <span className="font-mono text-[9px] text-ink-mute">conf {Math.round(c.confidence * 100)}%</span>}
+                          </div>
+                          {c.why && <p className="font-sans text-[12px] text-ink-soft leading-relaxed mt-1">{c.why}</p>}
+                          {c.sources?.length > 0 && (
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <span className="font-mono text-[8px] uppercase tracking-[0.08em] text-ink-mute">sources</span>
+                              {c.sources.slice(0, 4).map((u, i) => (
+                                <a key={i} href={u} target="_blank" rel="noreferrer" className="font-mono text-[9px] text-accent-deep hover:underline truncate max-w-[160px]">
+                                  {u.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )
             })()}
