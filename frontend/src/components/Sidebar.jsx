@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
-import { Search, ChevronRight, ChevronDown, Plus, X, PanelLeftClose } from 'lucide-react'
+import { Search, ChevronRight, ChevronDown, Plus, X, PanelLeftClose, Database } from 'lucide-react'
 
 const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSectors, onCollapse, onHome }, ref) {
   useImperativeHandle(ref, () => ({
@@ -87,6 +87,20 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
           title="Collapse sidebar"
         >
           <PanelLeftClose size={15} />
+        </button>
+      </div>
+
+      {/* Pipeline (CRM) nav */}
+      <div className="px-3 pt-3">
+        <button
+          onClick={() => onSelect({ type: 'crm' })}
+          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md border-0 cursor-pointer transition-all font-sans text-[12.5px] font-medium"
+          style={selected?.type === 'crm'
+            ? { background: 'rgba(0,0,0,0.09)', color: '#1a1a1a' }
+            : { background: 'rgba(255,255,255,0.4)', color: '#4a4a4a' }}
+        >
+          <Database size={13} className="text-ink-mute" />
+          Deal Pipeline
         </button>
       </div>
 

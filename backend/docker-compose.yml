@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16
+    container_name: xange_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: xange
+      POSTGRES_PASSWORD: xange
+      POSTGRES_DB: xange
+    ports:
+      - "5544:5432"
+    volumes:
+      - xange_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xange -d xange"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  xange_pgdata:
