@@ -212,8 +212,24 @@ alongside the existing root `src/` — but the monorepo layout above is preferre
 
 ## 9. Current status
 
-Weeks 1–4 of `BUILD_PLAN.md` are **built and verified end-to-end** against the
-real CSVs + a live LLM (OpenAI, provider-agnostic via LangChain).
+**Re-architecture M1 + M2 are built and verified live** (on top of the Weeks 1–4 base).
+
+- **M1:** Workspace→Segment rename; Company↔Segment **many-to-many** (`company_segments`,
+  per-segment tier/focal/notes); CSV import builds a **Sector** (segments derived from the
+  list-valued Segment column); Company × Segment matrix in the Sector UI.
+- **M2 — AI enrichment + web research:** a market-research pipeline finds competitors
+  **not in the CRM**. Stack = LangChain agent (OpenAI) → **Tavily** search →
+  **trafilatura → Playwright** page fetch → structured `Competitor` list with source
+  provenance + confidence. Endpoints: `POST /sectors/{id}/enrich` (sector enrichment) and
+  `POST /crm/companies/{id}/analyse` (**company-first**: AI suggests sector+segment, creates
+  them with the CRM company as focal, then researches competitors). Discovered competitors
+  are stored as `companies` with `origin='ai'`, name/domain-matched to the CRM
+  (`crm_company_id`). New `ai_enrichment` table logs each run. Sector UI: "Find competitors"
+  action, AI-discovered-competitors panel (sources + VerifyDot + in-CRM/net-new), and
+  AI-found / in-CRM stats. CRM pipeline: per-row "Analyse" action. Keys: `TAVILY_API_KEY`
+  in `backend/.env` (plus the LLM key); Playwright needs `playwright install chromium` once.
+
+Weeks 1–4 base (still true):
 
 - **Backend:** FastAPI + Postgres (Docker, port 5544), SQLAlchemy + Alembic.
   Ingestion (CRM + competitor, core+extras). Endpoints: sectors tree + detail +

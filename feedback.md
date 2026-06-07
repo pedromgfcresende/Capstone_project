@@ -1,8 +1,10 @@
 # Feedback → Required Changes (from handwritten notes)
 
-> Status: **Milestone 1 IMPLEMENTED ✅** (rename Workspace→Segment, Company↔Segment
-> N:N, sector-level CSV import, richer Sector UI with the Company×Segment matrix).
-> **Milestone 2 (AI enrichment + company-first flow) is NEXT, not yet built.**
+> Status: **Milestones 1 & 2 IMPLEMENTED ✅.**
+> M1 = rename Workspace→Segment, Company↔Segment N:N, sector-level CSV import, Company×Segment matrix.
+> M2 = AI enrichment (Tavily search + trafilatura→Playwright scraping + LLM) finding
+> competitors not in the CRM, sector "Find competitors" + company-first "Analyse from CRM"
+> flows, origin/crm_company_id CRM-matching, ai_enrichment table.
 > Original proposal + decisions retained below for reference.
 
 ---
