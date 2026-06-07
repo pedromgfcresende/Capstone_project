@@ -30,23 +30,27 @@ working end-to-end demo over completeness.**
 
 ## 2. Product structure
 
-Three-level hierarchy:
+Hierarchy (**M1 model** — "Workspace" was renamed to **Segment**, and companies
+are **many-to-many** with segments):
 
 ```
-Sector  (a market vertical, e.g. "Embedded Finance")
-└── Workspace  (one competitive analysis / "segment" — created from a competitor-analysis CSV)
-    └── Company  (a player in that landscape)
+Sector  (a market vertical — built by importing a competitor-analysis CSV)
+├── Segment  (a sub-market within the sector; derived from the CSV's Segment column)
+│     └── (company_segments join)  ← a company can compete in SEVERAL segments
+└── Company  (sector-scoped; per-segment tier/focal/notes live on the join)
 
 CRM / Pipeline  (separate, cross-cutting view of XAnge's whole deal-flow)
 ```
 
-- A **Sector** groups workspaces and carries an AI-synthesised "through-line".
-- A **Workspace** is one competitive landscape. **In v1, one competitor-analysis
-  CSV upload creates one workspace.**
-- A **Company** is a row in that competitive analysis.
+- A **Sector** is created by **importing a competitor CSV** at the sector level;
+  its **Segments are derived from the CSV's (list-valued) Segment column**. It
+  carries an AI-synthesised "through-line" + watchlist + open questions.
+- A **Segment** is one competitive sub-landscape (1:1 `segment_synthesis`).
+- A **Company** is sector-scoped and linked to one or more segments via
+  **`company_segments`** (per-segment `competitive_potential` / `focal` / `notes`).
 - The **CRM / Pipeline** view is a separate browse-and-filter surface over
-  XAnge's Affinity export (~20k companies in prod). **In v1 it is NOT joined to
-  the competitor data** — it stands alone.
+  XAnge's Affinity export. **Not joined** to the competitor data in v1 (AI-
+  enrichment matching via `companies.crm_company_id` / `origin` arrives in **M2**).
 
 ---
 
@@ -208,11 +212,26 @@ alongside the existing root `src/` — but the monorepo layout above is preferre
 
 ## 9. Current status
 
-- Frontend: core flow built and working, **in-memory only**, all AI faked, mock
-  data only. Known gaps: no persistence, `CommentaryTab` stub unwired, sidebar
-  company click hits a placeholder, IDs are `Date.now()`-based.
-- Backend: **not started** (this plan covers it).
-- Data: 3 CRM CSVs available; competitor-analysis CSV not yet exported (build
-  ingestion against the known columns; absorb the real file when it arrives).
+Weeks 1–4 of `BUILD_PLAN.md` are **built and verified end-to-end** against the
+real CSVs + a live LLM (OpenAI, provider-agnostic via LangChain).
 
-See `BUILD_PLAN.md` for the sequenced plan.
+- **Backend:** FastAPI + Postgres (Docker, port 5544), SQLAlchemy + Alembic.
+  Ingestion (CRM + competitor, core+extras). Endpoints: sectors tree + detail +
+  PATCH + synthesize + ask; workspaces detail + PATCH + synthesize; companies;
+  CRM list + facets; uploads (competitor/crm); verifications PATCH.
+  LangChain synthesis: workspace (summary, key insight, narrative, **market
+  read** TAM/SAM/SOM/CAGR/signals/regulatory, verifiable claims), sector
+  (headline, body, watchlist, open questions), cross-segment Q&A.
+- **Frontend:** loads from the API (no mock tree). CSV-upload workspace creation;
+  AI Analysis tab (synthesis + persisted VerifyDot); Overview tab (AI market
+  read); Players/Comparative/Differentiation (real company data); Sources
+  (seeded from claims); SectorCanvas (real synthesis + Q&A + Save); CRM pipeline
+  view (filters/search/pagination). Loading/empty/error states.
+- **Data:** 825 CRM companies seeded; demo competitor workspace from the
+  transcribed screenshot (`backend/scripts/demo_competitor.csv`).
+- **Remaining mock:** `src/data/segmentOverview.js` (only `FALLBACK_OVERVIEW`
+  empty-shape helper still used) and `src/data/companyProfiles.js`
+  (CompanyProfile modal — contacts/meetings were dropped for v1; it shows empty
+  states for real companies). No data source exists for these yet.
+
+See `BUILD_PLAN.md` for the plan and `README.md` for run + demo steps.
