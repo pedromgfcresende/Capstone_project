@@ -1,8 +1,11 @@
 """SQLAlchemy 2.0 models for the XAnge Market Intelligence Platform.
 
-Two domains:
-  - Competitive intelligence: sectors -> workspaces -> companies (+ synthesis, verifications)
-  - CRM / pipeline: crm_companies (separate, not joined in v1)
+Domains:
+  - Competitive intelligence: sectors -> segments -> companies, with companies
+    linked to segments many-to-many via `company_segments` (a company can compete
+    in multiple segments). Each segment has a 1:1 segment_synthesis; each sector
+    has its synthesis stored on the sector row + aggregated from its segments.
+  - CRM / pipeline: crm_companies (separate; AI-enrichment matching is M2).
 
 Every domain table has typed core columns plus an `extra` JSONB column for
 unmapped CSV columns (the "fixed core + flexible extras" rule).
@@ -56,16 +59,18 @@ class Sector(Base, TimestampMixin):
     label: Mapped[str] = mapped_column(String(200), nullable=False)
     synthesis_headline: Mapped[str | None] = mapped_column(Text)
     synthesis_body: Mapped[str | None] = mapped_column(Text)
-    # watchlist + open questions + model/generated_at (the cross-segment roll-up)
     synthesis_extra: Mapped[dict | None] = mapped_column(JSONB)
 
-    workspaces: Mapped[list[Workspace]] = relationship(
-        back_populates="sector", cascade="all, delete-orphan", order_by="Workspace.created_at"
+    segments: Mapped[list[Segment]] = relationship(
+        back_populates="sector", cascade="all, delete-orphan", order_by="Segment.created_at"
+    )
+    companies: Mapped[list[Company]] = relationship(
+        back_populates="sector", cascade="all, delete-orphan", order_by="Company.created_at"
     )
 
 
-class Workspace(Base, TimestampMixin):
-    __tablename__ = "workspaces"
+class Segment(Base, TimestampMixin):
+    __tablename__ = "segments"
 
     id: Mapped[uuid.UUID] = _pk()
     sector_id: Mapped[uuid.UUID] = mapped_column(
@@ -77,24 +82,26 @@ class Workspace(Base, TimestampMixin):
     summary: Mapped[str | None] = mapped_column(Text)
     key_insight: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="draft")  # draft|synthesizing|ready
-    # no FK (avoids circular dependency with uploads); just a soft reference
     source_upload_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
 
-    sector: Mapped[Sector] = relationship(back_populates="workspaces")
-    companies: Mapped[list[Company]] = relationship(
-        back_populates="workspace", cascade="all, delete-orphan", order_by="Company.created_at"
+    sector: Mapped[Sector] = relationship(back_populates="segments")
+    links: Mapped[list[CompanySegment]] = relationship(
+        back_populates="segment", cascade="all, delete-orphan"
     )
-    synthesis: Mapped[WorkspaceSynthesis | None] = relationship(
-        back_populates="workspace", cascade="all, delete-orphan", uselist=False
+    synthesis: Mapped[SegmentSynthesis | None] = relationship(
+        back_populates="segment", cascade="all, delete-orphan", uselist=False
     )
 
 
 class Company(Base, TimestampMixin):
+    """A company within a sector. Company-level facts are shared; per-segment
+    facts (tier, focal, notes) live on CompanySegment."""
+
     __tablename__ = "companies"
 
     id: Mapped[uuid.UUID] = _pk()
-    workspace_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    sector_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("sectors.id", ondelete="CASCADE"), index=True
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     founded: Mapped[str | None] = mapped_column(String(50))
@@ -103,22 +110,50 @@ class Company(Base, TimestampMixin):
     funding_amount: Mapped[str | None] = mapped_column(String(200))
     top_investors: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
-    segment: Mapped[str | None] = mapped_column(String(200))
     primary_customer: Mapped[str | None] = mapped_column(Text)
-    notes: Mapped[str | None] = mapped_column(Text)
-    competitive_potential: Mapped[int | None] = mapped_column(Integer)
-    focal: Mapped[bool] = mapped_column(Boolean, default=False)
+    # provenance — 'csv' today; 'crm' / 'ai' arrive with M2 enrichment
+    origin: Mapped[str] = mapped_column(String(20), default="csv")
+    crm_company_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     extra: Mapped[dict] = mapped_column(JSONB, default=dict)
 
-    workspace: Mapped[Workspace] = relationship(back_populates="companies")
+    sector: Mapped[Sector] = relationship(back_populates="companies")
+    links: Mapped[list[CompanySegment]] = relationship(
+        back_populates="company", cascade="all, delete-orphan"
+    )
 
 
-class WorkspaceSynthesis(Base):
-    __tablename__ = "workspace_synthesis"
+class CompanySegment(Base):
+    """Join: a company competing in a segment, with per-segment attributes."""
+
+    __tablename__ = "company_segments"
+    __table_args__ = (
+        UniqueConstraint("company_id", "segment_id", name="uq_company_segment"),
+    )
 
     id: Mapped[uuid.UUID] = _pk()
-    workspace_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("workspaces.id", ondelete="CASCADE"), unique=True, index=True
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("companies.id", ondelete="CASCADE"), index=True
+    )
+    segment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("segments.id", ondelete="CASCADE"), index=True
+    )
+    competitive_potential: Mapped[int | None] = mapped_column(Integer)
+    focal: Mapped[bool] = mapped_column(Boolean, default=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    company: Mapped[Company] = relationship(back_populates="links")
+    segment: Mapped[Segment] = relationship(back_populates="links")
+
+
+class SegmentSynthesis(Base):
+    __tablename__ = "segment_synthesis"
+
+    id: Mapped[uuid.UUID] = _pk()
+    segment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("segments.id", ondelete="CASCADE"), unique=True, index=True
     )
     overview: Mapped[dict | None] = mapped_column(JSONB)
     comparative: Mapped[dict | None] = mapped_column(JSONB)
@@ -129,7 +164,7 @@ class WorkspaceSynthesis(Base):
     model: Mapped[str | None] = mapped_column(String(100))
     generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    workspace: Mapped[Workspace] = relationship(back_populates="synthesis")
+    segment: Mapped[Segment] = relationship(back_populates="synthesis")
 
 
 class Verification(Base, TimestampMixin):
@@ -139,7 +174,7 @@ class Verification(Base, TimestampMixin):
     )
 
     id: Mapped[uuid.UUID] = _pk()
-    entity_type: Mapped[str] = mapped_column(String(40), index=True)
+    entity_type: Mapped[str] = mapped_column(String(40), index=True)  # segment_synthesis|sector
     entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
     claim_key: Mapped[str] = mapped_column(String(200))
     status: Mapped[str] = mapped_column(String(20), default="ai")  # ai|verified|needs
@@ -191,6 +226,6 @@ class Upload(Base, TimestampMixin):
     row_count: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|done|failed
     error: Mapped[str | None] = mapped_column(Text)
-    workspace_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("workspaces.id", ondelete="SET NULL")
+    sector_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("sectors.id", ondelete="SET NULL")
     )

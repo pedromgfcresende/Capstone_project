@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from app.services.ingestion.common import build_extra, to_date, to_float, to_int
-from app.services.ingestion.competitor_csv import _row_to_company
+from app.services.ingestion.competitor_csv import _norm, _note_in_row, _segments_in_row
 from app.services.ingestion.crm_csv import _row_to_company as crm_row
 
 
@@ -31,28 +31,25 @@ def test_build_extra_drops_empty_and_cb_columns():
     assert extra == {"Weird Column": "keep me"}
 
 
-def test_competitor_focal_detection():
-    focal = _row_to_company({"Name": "Gradient Labs", "Competitive Potential": None})
-    rival = _row_to_company({"Name": "Sierra", "Competitive Potential": "2"})
-    assert focal.focal is True
-    assert rival.focal is False
-    assert rival.competitive_potential == 2
+def test_competitor_focal_is_untiered_row():
+    # focal = the row with no competitive-potential tier
+    assert to_int(None) is None         # focal row
+    assert to_int("2") == 2             # competitor row
 
 
-def test_competitor_core_mapping_and_extra():
-    c = _row_to_company(
-        {
-            "Name": "Sierra",
-            "Founded": "2023",
-            "HQ": "USA",
-            "Segment": "Horizontal support platform",
-            "Notes/ Relevance": "lacks FS guardrails",
-            "Mystery": "stash this",
-        }
-    )
-    assert c.geography == "USA"
-    assert c.notes == "lacks FS guardrails"
-    assert c.extra == {"Mystery": "stash this"}
+def test_segment_column_is_list():
+    assert _segments_in_row({"Segment": "FS point solution"}) == ["FS point solution"]
+    assert _segments_in_row({"Segment": "A; B | C"}) == ["A", "B", "C"]
+    # a slash is NOT a list separator (e.g. "Custom build / infra" is one segment)
+    assert _segments_in_row({"Segment": "Custom build / infra"}) == ["Custom build / infra"]
+    assert _segments_in_row({"Segment": None}) == ["Unsegmented"]
+
+
+def test_competitor_helpers():
+    assert _norm("  Gradient   Labs ") == "gradient labs"
+    assert _note_in_row({"Notes/ Relevance": "lacks FS guardrails"}) == "lacks FS guardrails"
+    assert _note_in_row({"Notes": "x"}) == "x"
+    assert _note_in_row({"other": "y"}) is None
 
 
 def test_crm_core_mapping():

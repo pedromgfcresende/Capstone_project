@@ -1,23 +1,26 @@
-"""Ingest a competitor-analysis CSV -> one Workspace + its companies.
+"""Ingest a competitor-analysis CSV -> one Sector, fanning out into Segments and
+companies linked many-to-many.
 
-Maps the known columns (see the screenshot/CLAUDE.md) to typed fields and keeps
-any extra columns in `extra`. The focal company is the row with no
-'Competitive Potential' tier (the subject of the analysis).
+Each CSV row is a company. Its "Segment" cell is treated as a LIST (split on
+';', '|', or newline) so one company can compete in several segments. Companies
+are deduped by name within the sector; per-segment facts (competitive potential,
+focal, notes) live on the company_segments join. The focal company is the row
+with no competitive-potential tier (the subject of the analysis).
 """
 
 from __future__ import annotations
 
 import io
+import re
 
 import pandas as pd
 from sqlalchemy.orm import Session
 
-from app.db.models import Company, Sector, Upload, Workspace
+from app.db.models import Company, CompanySegment, Sector, Segment, Upload
 from app.services.ingestion.common import build_extra, clean, to_int
 
-# CSV column -> model field. Several spellings tolerated for the notes column.
-CORE_MAP = {
-    "Competitive Potential": "competitive_potential",
+# company-level CSV column -> model field
+COMPANY_MAP = {
     "Name": "name",
     "Founded": "founded",
     "HQ": "geography",
@@ -25,77 +28,102 @@ CORE_MAP = {
     "Funding Amount": "funding_amount",
     "Top Investors": "top_investors",
     "Description": "description",
-    "Segment": "segment",
     "Primary Customer": "primary_customer",
-    "Notes/ Relevance": "notes",
-    "Notes/Relevance": "notes",
-    "Notes / Relevance": "notes",
-    "Notes": "notes",
 }
+# columns consumed elsewhere (not company-level, not extra)
+_CONSUMED = set(COMPANY_MAP) | {
+    "Competitive Potential", "Segment",
+    "Notes/ Relevance", "Notes/Relevance", "Notes / Relevance", "Notes",
+}
+_NOTE_KEYS = ["Notes/ Relevance", "Notes/Relevance", "Notes / Relevance", "Notes"]
 
 
-def _row_to_company(row: dict) -> Company:
-    fields: dict = {}
-    for csv_col, model_field in CORE_MAP.items():
-        if csv_col not in row:
-            continue
-        raw = row[csv_col]
-        if model_field == "competitive_potential":
-            fields[model_field] = to_int(raw)
-        else:
-            fields[model_field] = clean(raw)
+def _norm(name: str) -> str:
+    return re.sub(r"\s+", " ", (name or "").strip()).lower()
 
-    fields["name"] = fields.get("name") or "(unnamed)"
-    fields["focal"] = fields.get("competitive_potential") is None
-    fields["extra"] = build_extra(row, set(CORE_MAP.keys()))
-    return Company(**fields)
+
+def _segments_in_row(row: dict) -> list[str]:
+    raw = clean(row.get("Segment"))
+    if not raw:
+        return ["Unsegmented"]
+    parts = [p.strip() for p in re.split(r"[;|\n]", str(raw)) if p.strip()]
+    return parts or ["Unsegmented"]
+
+
+def _note_in_row(row: dict) -> str | None:
+    for k in _NOTE_KEYS:
+        if k in row:
+            v = clean(row.get(k))
+            if v:
+                return v
+    return None
 
 
 def ingest_competitor_df(
     db: Session,
     df: pd.DataFrame,
     *,
-    title: str,
-    sector_id=None,
-    sector_label: str | None = None,
+    sector_label: str,
     filename: str | None = None,
-) -> Workspace:
-    """Create a workspace (under an existing or new sector) from the dataframe."""
+) -> Sector:
     upload = Upload(kind="competitor", filename=filename, status="pending")
     db.add(upload)
     try:
-        # Resolve sector
-        sector = None
-        if sector_id is not None:
-            sector = db.get(Sector, sector_id)
+        # find or create the sector
+        sector = db.query(Sector).filter(Sector.label == sector_label).first()
         if sector is None:
-            label = sector_label or "Uncategorised"
-            sector = db.query(Sector).filter(Sector.label == label).first()
-            if sector is None:
-                sector = Sector(label=label)
-                db.add(sector)
+            sector = Sector(label=sector_label)
+            db.add(sector)
+            db.flush()
+
+        companies: dict[str, Company] = {}       # norm name -> Company
+        segments: dict[str, Segment] = {}        # norm title -> Segment
+        links: set[tuple[str, str]] = set()      # (company_norm, segment_norm)
+        n_links = 0
+
+        for raw in df.to_dict(orient="records"):
+            cname = clean(raw.get("Name")) or "(unnamed)"
+            ckey = _norm(cname)
+            tier = to_int(raw.get("Competitive Potential"))
+            is_focal = tier is None
+            note = _note_in_row(raw)
+
+            # company (dedup within sector)
+            company = companies.get(ckey)
+            if company is None:
+                fields = {dst: clean(raw.get(src)) for src, dst in COMPANY_MAP.items()}
+                fields["name"] = cname
+                fields["origin"] = "csv"
+                fields["extra"] = build_extra(raw, _CONSUMED)
+                company = Company(sector_id=sector.id, **fields)
+                db.add(company)
                 db.flush()
+                companies[ckey] = company
 
-        companies = [_row_to_company(r) for r in df.to_dict(orient="records")]
-        focal = next((c for c in companies if c.focal), None)
+            for sname in _segments_in_row(raw):
+                skey = _norm(sname)
+                segment = segments.get(skey)
+                if segment is None:
+                    segment = Segment(sector_id=sector.id, title=sname, status="ready")
+                    db.add(segment)
+                    db.flush()
+                    segments[skey] = segment
+                if is_focal and not segment.focal_company:
+                    segment.focal_company = cname
+                if (ckey, skey) not in links:
+                    db.add(CompanySegment(
+                        company_id=company.id, segment_id=segment.id,
+                        competitive_potential=tier, focal=is_focal, notes=note,
+                    ))
+                    links.add((ckey, skey))
+                    n_links += 1
 
-        workspace = Workspace(
-            sector_id=sector.id,
-            title=title,
-            focal_company=focal.name if focal else None,
-            status="ready",
-            source_upload_id=upload.id,
-            companies=companies,
-        )
-        db.add(workspace)
-        db.flush()
-
-        upload.row_count = len(companies)
+        upload.row_count = len(df)
         upload.status = "done"
-        upload.workspace_id = workspace.id
+        upload.sector_id = sector.id
         db.commit()
-        db.refresh(workspace)
-        return workspace
+        db.refresh(sector)
+        return sector
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         upload.status = "failed"
@@ -106,9 +134,7 @@ def ingest_competitor_df(
 
 
 def ingest_competitor_bytes(
-    db: Session, content: bytes, *, title: str, sector_id=None, sector_label=None, filename=None
-) -> Workspace:
+    db: Session, content: bytes, *, sector_label: str, filename: str | None = None
+) -> Sector:
     df = pd.read_csv(io.BytesIO(content))
-    return ingest_competitor_df(
-        db, df, title=title, sector_id=sector_id, sector_label=sector_label, filename=filename
-    )
+    return ingest_competitor_df(db, df, sector_label=sector_label, filename=filename)

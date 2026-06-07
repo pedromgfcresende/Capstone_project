@@ -14,7 +14,11 @@ numbers, investors, or facts not present in the input.
 - For `claims`, extract 4-8 of the most decision-relevant, checkable factual \
 statements (e.g. positioning, funding stage, differentiation). Each needs a \
 short stable snake_case `key` and the claim `text`. These become human-verifiable \
-items, so keep each claim atomic and falsifiable."""
+items, so keep each claim atomic and falsifiable.
+- For `market`, give a best-effort FIRST-PASS estimate (TAM/SAM/SOM, CAGR, adoption \
+stage, tailwinds/headwinds/why-now, regulatory). These are explicitly estimates the \
+analyst will verify — reason from the companies, their funding, and your knowledge of \
+the space. Do not refuse; approximate and stay directionally sensible."""
 
 HUMAN_TEMPLATE = """Market / workspace: {title}
 Focal company: {focal}

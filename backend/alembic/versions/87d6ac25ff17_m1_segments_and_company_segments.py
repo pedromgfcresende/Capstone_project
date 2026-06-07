@@ -1,8 +1,8 @@
-"""initial schema
+"""m1 segments and company_segments
 
-Revision ID: 24d257728b12
+Revision ID: 87d6ac25ff17
 Revises: 
-Create Date: 2026-06-07 12:03:41.878512
+Create Date: 2026-06-07 17:34:29.282958
 """
 from typing import Sequence, Union
 
@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision: str = '24d257728b12'
+revision: str = '87d6ac25ff17'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -56,6 +56,7 @@ def upgrade() -> None:
     sa.Column('label', sa.String(length=200), nullable=False),
     sa.Column('synthesis_headline', sa.Text(), nullable=True),
     sa.Column('synthesis_body', sa.Text(), nullable=True),
+    sa.Column('synthesis_extra', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('id')
@@ -75,7 +76,27 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_verifications_entity_id'), 'verifications', ['entity_id'], unique=False)
     op.create_index(op.f('ix_verifications_entity_type'), 'verifications', ['entity_type'], unique=False)
-    op.create_table('workspaces',
+    op.create_table('companies',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('sector_id', sa.UUID(), nullable=False),
+    sa.Column('name', sa.String(length=200), nullable=False),
+    sa.Column('founded', sa.String(length=50), nullable=True),
+    sa.Column('geography', sa.String(length=200), nullable=True),
+    sa.Column('funding_status', sa.String(length=200), nullable=True),
+    sa.Column('funding_amount', sa.String(length=200), nullable=True),
+    sa.Column('top_investors', sa.Text(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('primary_customer', sa.Text(), nullable=True),
+    sa.Column('origin', sa.String(length=20), nullable=False),
+    sa.Column('crm_company_id', sa.UUID(), nullable=True),
+    sa.Column('extra', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['sector_id'], ['sectors.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_companies_sector_id'), 'companies', ['sector_id'], unique=False)
+    op.create_table('segments',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('sector_id', sa.UUID(), nullable=False),
     sa.Column('title', sa.String(length=300), nullable=False),
@@ -90,29 +111,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['sector_id'], ['sectors.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_workspaces_sector_id'), 'workspaces', ['sector_id'], unique=False)
-    op.create_table('companies',
-    sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('workspace_id', sa.UUID(), nullable=False),
-    sa.Column('name', sa.String(length=200), nullable=False),
-    sa.Column('founded', sa.String(length=50), nullable=True),
-    sa.Column('geography', sa.String(length=200), nullable=True),
-    sa.Column('funding_status', sa.String(length=200), nullable=True),
-    sa.Column('funding_amount', sa.String(length=200), nullable=True),
-    sa.Column('top_investors', sa.Text(), nullable=True),
-    sa.Column('description', sa.Text(), nullable=True),
-    sa.Column('segment', sa.String(length=200), nullable=True),
-    sa.Column('primary_customer', sa.Text(), nullable=True),
-    sa.Column('notes', sa.Text(), nullable=True),
-    sa.Column('competitive_potential', sa.Integer(), nullable=True),
-    sa.Column('focal', sa.Boolean(), nullable=False),
-    sa.Column('extra', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_companies_workspace_id'), 'companies', ['workspace_id'], unique=False)
+    op.create_index(op.f('ix_segments_sector_id'), 'segments', ['sector_id'], unique=False)
     op.create_table('uploads',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('kind', sa.String(length=20), nullable=False),
@@ -120,15 +119,30 @@ def upgrade() -> None:
     sa.Column('row_count', sa.Integer(), nullable=True),
     sa.Column('status', sa.String(length=20), nullable=False),
     sa.Column('error', sa.Text(), nullable=True),
-    sa.Column('workspace_id', sa.UUID(), nullable=True),
+    sa.Column('sector_id', sa.UUID(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['sector_id'], ['sectors.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('workspace_synthesis',
+    op.create_table('company_segments',
     sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('workspace_id', sa.UUID(), nullable=False),
+    sa.Column('company_id', sa.UUID(), nullable=False),
+    sa.Column('segment_id', sa.UUID(), nullable=False),
+    sa.Column('competitive_potential', sa.Integer(), nullable=True),
+    sa.Column('focal', sa.Boolean(), nullable=False),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['segment_id'], ['segments.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('company_id', 'segment_id', name='uq_company_segment')
+    )
+    op.create_index(op.f('ix_company_segments_company_id'), 'company_segments', ['company_id'], unique=False)
+    op.create_index(op.f('ix_company_segments_segment_id'), 'company_segments', ['segment_id'], unique=False)
+    op.create_table('segment_synthesis',
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('segment_id', sa.UUID(), nullable=False),
     sa.Column('overview', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('comparative', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('differentiation', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
@@ -137,22 +151,25 @@ def upgrade() -> None:
     sa.Column('sources', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('model', sa.String(length=100), nullable=True),
     sa.Column('generated_at', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['segment_id'], ['segments.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_workspace_synthesis_workspace_id'), 'workspace_synthesis', ['workspace_id'], unique=True)
+    op.create_index(op.f('ix_segment_synthesis_segment_id'), 'segment_synthesis', ['segment_id'], unique=True)
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_index(op.f('ix_workspace_synthesis_workspace_id'), table_name='workspace_synthesis')
-    op.drop_table('workspace_synthesis')
+    op.drop_index(op.f('ix_segment_synthesis_segment_id'), table_name='segment_synthesis')
+    op.drop_table('segment_synthesis')
+    op.drop_index(op.f('ix_company_segments_segment_id'), table_name='company_segments')
+    op.drop_index(op.f('ix_company_segments_company_id'), table_name='company_segments')
+    op.drop_table('company_segments')
     op.drop_table('uploads')
-    op.drop_index(op.f('ix_companies_workspace_id'), table_name='companies')
+    op.drop_index(op.f('ix_segments_sector_id'), table_name='segments')
+    op.drop_table('segments')
+    op.drop_index(op.f('ix_companies_sector_id'), table_name='companies')
     op.drop_table('companies')
-    op.drop_index(op.f('ix_workspaces_sector_id'), table_name='workspaces')
-    op.drop_table('workspaces')
     op.drop_index(op.f('ix_verifications_entity_type'), table_name='verifications')
     op.drop_index(op.f('ix_verifications_entity_id'), table_name='verifications')
     op.drop_table('verifications')

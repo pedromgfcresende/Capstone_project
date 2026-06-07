@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 
 from app.config import settings
-from app.db.models import CrmCompany, Sector, Workspace
+from app.db.models import Company, CrmCompany, Sector, Segment
 from app.db.session import SessionLocal
 from app.services.ingestion.competitor_csv import ingest_competitor_df
 from app.services.ingestion.crm_csv import ingest_crm_frames
@@ -46,35 +46,33 @@ def seed_crm(db) -> None:
     print(f"· Ingested {upload.row_count} CRM companies (status={upload.status})")
 
 
-def seed_demo_workspace(db) -> None:
-    """Optional: seed a competitor workspace if a demo CSV is present."""
+def seed_demo_sector(db) -> None:
+    """Optional: seed a competitor sector if a demo CSV is present."""
     demo = Path(__file__).resolve().parent.parent / "scripts" / "demo_competitor.csv"
     if not demo.exists():
-        print("· No demo_competitor.csv — skipping demo workspace")
+        print("· No demo_competitor.csv — skipping demo sector")
         return
-    if db.query(Workspace).count() > 0:
-        print("· Workspace already exists, skipping demo")
+    if db.query(Sector).count() > 0:
+        print("· Sector already exists, skipping demo")
         return
     df = pd.read_csv(demo)
-    ws = ingest_competitor_df(
-        db,
-        df,
-        title="AI Agents for Financial Services",
-        sector_label="AI in Financial Services",
-        filename="demo_competitor.csv",
+    sector = ingest_competitor_df(
+        db, df, sector_label="AI Agents for Financial Services", filename="demo_competitor.csv"
     )
-    print(f"· Created demo workspace '{ws.title}' with {len(ws.companies)} companies")
+    print(f"· Created sector '{sector.label}' with {len(sector.segments)} segments, "
+          f"{len(sector.companies)} companies")
 
 
 def main() -> int:
     db = SessionLocal()
     try:
         seed_crm(db)
-        seed_demo_workspace(db)
+        seed_demo_sector(db)
         sectors = db.query(Sector).count()
-        ws = db.query(Workspace).count()
+        segs = db.query(Segment).count()
+        comps = db.query(Company).count()
         crm = db.query(CrmCompany).count()
-        print(f"\nDONE — sectors={sectors} workspaces={ws} crm_companies={crm}")
+        print(f"\nDONE — sectors={sectors} segments={segs} companies={comps} crm_companies={crm}")
     finally:
         db.close()
     return 0

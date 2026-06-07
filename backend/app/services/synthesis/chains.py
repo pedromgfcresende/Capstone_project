@@ -27,10 +27,39 @@ class Claim(BaseModel):
     text: str = Field(description="an atomic, checkable factual statement")
 
 
+class Signal(BaseModel):
+    title: str = Field(description="short signal headline")
+    detail: str = Field(description="one sentence of supporting detail")
+
+
+class RegItem(BaseModel):
+    region: str = Field(description="2-4 letter region code, e.g. EU, US, UK")
+    date: str = Field(description="approx date or year")
+    label: str = Field(description="the regulatory development")
+    note: str = Field(description="why it matters")
+    impact: str = Field(description="High | Medium | Low")
+
+
+class Market(BaseModel):
+    tam: str = Field(description="estimated total addressable market, e.g. '$8B' (best-effort)")
+    sam: str = Field(description="estimated serviceable addressable market")
+    som: str = Field(description="estimated obtainable market near-term")
+    cagr: str = Field(description="estimated market CAGR, e.g. '~25% CAGR'")
+    adoption_stage: str = Field(
+        description="one of: Early Adopters | Early Majority | Late Majority | Laggards"
+    )
+    adoption_evidence: str = Field(description="one sentence justifying the adoption stage")
+    tailwinds: list[Signal] = Field(description="2-4 structural tailwinds")
+    headwinds: list[Signal] = Field(description="2-4 structural headwinds")
+    why_now: list[Signal] = Field(description="2-4 'why now' catalysts")
+    regulatory: list[RegItem] = Field(description="0-4 relevant regulatory items")
+
+
 class WorkspaceSynthesisResult(BaseModel):
     summary: str = Field(description="2-3 sentence executive summary of the landscape")
     key_insight: str = Field(description="the single most important takeaway, one sentence")
     market_overview: str = Field(description="market context, structure, dynamics (1 paragraph)")
+    market: Market = Field(description="estimated, first-pass market sizing and signals")
     comparative: str = Field(description="how the players compare across the field (1 paragraph)")
     differentiation: str = Field(
         description="how the focal company is differentiated vs competitors (1 paragraph)"
@@ -39,43 +68,23 @@ class WorkspaceSynthesisResult(BaseModel):
     claims: list[Claim] = Field(description="4-8 verifiable factual claims with stable keys")
 
 
-def _company_payload(companies: list) -> list[dict]:
-    out = []
-    for c in companies:
-        out.append(
-            {
-                "name": c.name,
-                "focal": c.focal,
-                "tier": c.competitive_potential,
-                "founded": c.founded,
-                "geography": c.geography,
-                "funding_status": c.funding_status,
-                "funding_amount": c.funding_amount,
-                "top_investors": c.top_investors,
-                "segment": c.segment,
-                "primary_customer": c.primary_customer,
-                "description": c.description,
-                "notes": c.notes,
-            }
-        )
-    return out
-
-
 def _model(temperature: float = 0.3):
     return init_chat_model(
         settings.resolved_model, model_provider=settings.llm_provider, temperature=temperature
     )
 
 
-def synthesize_workspace(
-    *, title: str, focal: str | None, thesis: str | None, companies: list
+def synthesize_segment(
+    *, title: str, focal: str | None, thesis: str | None, companies: list[dict]
 ) -> WorkspaceSynthesisResult:
+    """companies: list of dicts (name, focal, tier, founded, geography, funding_status,
+    funding_amount, top_investors, segment, primary_customer, description, notes)."""
     structured = _model().with_structured_output(WorkspaceSynthesisResult)
     human = HUMAN_TEMPLATE.format(
         title=title,
         focal=focal or "(none specified)",
         thesis=thesis or "(none provided)",
-        companies_json=json.dumps(_company_payload(companies), ensure_ascii=False, indent=2),
+        companies_json=json.dumps(companies, ensure_ascii=False, indent=2),
     )
     return structured.invoke(
         [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=human)]

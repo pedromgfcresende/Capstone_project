@@ -54,18 +54,18 @@ def patch_sector(sector_id: uuid.UUID, payload: SectorPatch, db: Session = Depen
 
 def _segments_payload(sector: Sector) -> list[dict]:
     out = []
-    for ws in sector.workspaces:
+    for seg in sector.segments:
         companies = [
-            {"name": c.name, "tier": c.competitive_potential, "focal": c.focal,
-             "segment": c.segment, "funding_status": c.funding_status}
-            for c in ws.companies
+            {"name": l.company.name, "tier": l.competitive_potential, "focal": l.focal,
+             "segment": seg.title, "funding_status": l.company.funding_status}
+            for l in seg.links
         ]
         out.append(
             {
-                "title": ws.title,
-                "focal": ws.focal_company,
-                "summary": ws.summary,
-                "key_insight": ws.key_insight,
+                "title": seg.title,
+                "focal": seg.focal_company,
+                "summary": seg.summary,
+                "key_insight": seg.key_insight,
                 "companies": companies,
             }
         )
@@ -77,7 +77,7 @@ def synthesize(sector_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     sector = db.get(Sector, sector_id)
     if sector is None:
         raise HTTPException(status_code=404, detail="Sector not found")
-    if not sector.workspaces:
+    if not sector.segments:
         raise HTTPException(status_code=400, detail="Sector has no segments to synthesize")
     if not settings.has_llm_key:
         raise HTTPException(

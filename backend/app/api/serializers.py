@@ -1,22 +1,87 @@
-"""Serialize ORM objects into the shape the existing React frontend expects.
+"""Serialize ORM objects into the shape the React frontend expects (camelCase).
 
-The frontend was built around the mock-data shape (camelCase, `fundRound`,
-`priority`, nested workspaces/companies), so we mirror it here to avoid a large
-frontend rewrite in Week 1.
+Company is now sector-scoped and linked to segments many-to-many. A segment's
+`companies` are the per-segment views (company fields + the link's tier/focal/
+notes), so the existing tabs keep working. The sector also exposes a flat
+`companies` list with each company's segment memberships — the source for the
+Company × Segment matrix.
 """
 
 from __future__ import annotations
 
 from datetime import date, datetime
 
-from app.db.models import Company, CrmCompany, Sector, Workspace, WorkspaceSynthesis
+from app.db.models import (
+    Company,
+    CompanySegment,
+    CrmCompany,
+    Sector,
+    Segment,
+    SegmentSynthesis,
+)
 
 
 def _day(dt: datetime | None) -> str | None:
     return dt.date().isoformat() if dt else None
 
 
-def synthesis_out(syn: WorkspaceSynthesis | None, verifications: dict[str, str] | None = None) -> dict | None:
+def _iso(d: date | None) -> str | None:
+    return d.isoformat() if d else None
+
+
+# ── companies ─────────────────────────────────────────────────────────────
+
+
+def company_link_out(link: CompanySegment) -> dict:
+    """Per-segment view of a company (the shape the tabs consume)."""
+    c = link.company
+    return {
+        "id": str(c.id),
+        "linkId": str(link.id),
+        "name": c.name,
+        "focal": link.focal,
+        "founded": c.founded,
+        "geography": c.geography,
+        "fundRound": c.funding_status,
+        "fundingAmount": c.funding_amount,
+        "topInvestors": c.top_investors,
+        "priority": link.competitive_potential,
+        "description": c.description,
+        "segment": link.segment.title if link.segment else None,
+        "primaryCustomer": c.primary_customer,
+        "notes": link.notes,
+        "origin": c.origin,
+        "extra": c.extra or {},
+    }
+
+
+def company_matrix_out(c: Company) -> dict:
+    """Company-level view + its segment memberships (matrix source)."""
+    segs = sorted(c.links, key=lambda l: (l.segment.title if l.segment else ""))
+    return {
+        "id": str(c.id),
+        "name": c.name,
+        "geography": c.geography,
+        "fundRound": c.funding_status,
+        "founded": c.founded,
+        "origin": c.origin,
+        "focal": any(l.focal for l in c.links),
+        "segments": [
+            {
+                "segmentId": str(l.segment_id),
+                "title": l.segment.title if l.segment else None,
+                "tier": l.competitive_potential,
+                "focal": l.focal,
+            }
+            for l in segs
+        ],
+    }
+
+
+# ── synthesis ─────────────────────────────────────────────────────────────
+
+
+def synthesis_out(syn: SegmentSynthesis | None, verifications: dict[str, str] | None = None) -> dict | None:
     if syn is None:
         return None
     return {
@@ -25,60 +90,47 @@ def synthesis_out(syn: WorkspaceSynthesis | None, verifications: dict[str, str] 
         "differentiation": syn.differentiation,
         "summary": syn.summary,
         "commentary": syn.commentary,
-        "sources": syn.sources,  # holds {"claims": [...]} in v1
+        "sources": syn.sources,
         "model": syn.model,
         "generatedAt": syn.generated_at.isoformat() if syn.generated_at else None,
         "verifications": verifications or {},
     }
 
 
-def company_out(c: Company) -> dict:
-    return {
-        "id": str(c.id),
-        "name": c.name,
-        "focal": c.focal,
-        "founded": c.founded,
-        "geography": c.geography,
-        "fundRound": c.funding_status,
-        "fundingAmount": c.funding_amount,
-        "topInvestors": c.top_investors,
-        "priority": c.competitive_potential,
-        "description": c.description,
-        "segment": c.segment,
-        "primaryCustomer": c.primary_customer,
-        "notes": c.notes,
-        "extra": c.extra or {},
-    }
+# ── segments ──────────────────────────────────────────────────────────────
 
 
-def workspace_out(
-    w: Workspace,
+def segment_out(
+    s: Segment,
     *,
     with_companies: bool = True,
     with_synthesis: bool = False,
     verifications: dict[str, str] | None = None,
 ) -> dict:
     out = {
-        "id": str(w.id),
-        "sectorId": str(w.sector_id),
-        "title": w.title,
-        "focalCompany": w.focal_company,
-        "updatedAt": _day(w.updated_at),
-        "status": w.status,
-        "summary": w.summary,
-        "keyInsight": w.key_insight,
-        "thesis": w.thesis,
-        "priorityCompanies": [],  # filled by synthesis (Week 3)
+        "id": str(s.id),
+        "sectorId": str(s.sector_id),
+        "title": s.title,
+        "focalCompany": s.focal_company,
+        "updatedAt": _day(s.updated_at),
+        "status": s.status,
+        "summary": s.summary,
+        "keyInsight": s.key_insight,
+        "thesis": s.thesis,
+        "priorityCompanies": [],
         "openQuestions": [],
     }
     if with_companies:
-        out["companies"] = [company_out(c) for c in w.companies]
+        out["companies"] = [company_link_out(l) for l in s.links]
     if with_synthesis:
-        out["synthesis"] = synthesis_out(w.synthesis, verifications)
+        out["synthesis"] = synthesis_out(s.synthesis, verifications)
     return out
 
 
-def sector_out(s: Sector, *, with_workspaces: bool = True) -> dict:
+# ── sectors ───────────────────────────────────────────────────────────────
+
+
+def sector_out(s: Sector, *, with_segments: bool = True, with_companies: bool = True) -> dict:
     out = {
         "id": str(s.id),
         "label": s.label,
@@ -87,13 +139,15 @@ def sector_out(s: Sector, *, with_workspaces: bool = True) -> dict:
         "synthesisBody": s.synthesis_body,
         "synthesisExtra": s.synthesis_extra or {},
     }
-    if with_workspaces:
-        out["workspaces"] = [workspace_out(w) for w in s.workspaces]
+    if with_segments:
+        out["segments"] = [segment_out(seg) for seg in s.segments]
+        out["workspaces"] = out["segments"]  # legacy alias (frontend transitioning)
+    if with_companies:
+        out["companies"] = [company_matrix_out(c) for c in s.companies]
     return out
 
 
-def _iso(d: date | None) -> str | None:
-    return d.isoformat() if d else None
+# ── CRM ───────────────────────────────────────────────────────────────────
 
 
 def crm_company_out(c: CrmCompany) -> dict:
