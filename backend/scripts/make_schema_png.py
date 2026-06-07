@@ -32,6 +32,9 @@ TABLES = {
     "verifications": ["id  ·  uuid  PK", "entity_type  ·  segment_synthesis|sector", "entity_id  ⇢  uuid (polymorphic)",
                       "claim_key  ·  text", "status  ·  ai|verified|needs", "verified_by / verified_at",
                       "UNIQUE(entity_type, entity_id, claim_key)"],
+    "ai_enrichment": ["id  ·  uuid  PK", "sector_id  →  sectors.id  (FK, cascade)", "focal_company_id  ·  uuid",
+                      "segment_id  ·  uuid", "status  ·  pending|done|failed", "query_plan  ·  jsonb",
+                      "result  ·  jsonb  (competitors + sources)", "model / error"],
     "crm_companies": ["id  ·  uuid  PK", "affinity_row_id / organization_id", "name / website",
                       "lead_status  ·  hot|pass|unknown", "affinity_status / owner / tag", "investors / investment_stage",
                       "country / industry_xange", "description  ·  text", "year_founded  ·  int",
@@ -48,6 +51,7 @@ POS = {
     "uploads":            (6.7, 7.6),
     "verifications":      (6.7, 3.6),
     "crm_companies":      (12.9, 17.6),
+    "ai_enrichment":      (12.9, 6.0),
 }
 WIDTH = {k: 5.8 for k in TABLES}; WIDTH["company_segments"] = 5.8; WIDTH["crm_companies"] = 6.0
 HDR_H, ROW_H, PAD = 0.62, 0.42, 0.12
@@ -119,10 +123,10 @@ edge("uploads", 1, "sectors", FK, rad=-0.2, label="N:1")
 edge("segments", 6, "uploads", FK, dashed=True, rad=-0.35, label="soft")
 edge("verifications", 2, "segment_synthesis", FK, dashed=True, rad=-0.3, label="polymorphic")
 
-ax.text(0.4, 20.2, "XAnge Market Intelligence — Postgres schema (M1)", fontsize=20, fontweight="bold", color=INK)
+ax.text(0.4, 20.2, "XAnge Market Intelligence — Postgres schema (M2)", fontsize=20, fontweight="bold", color=INK)
 ax.text(0.4, 19.75, "sectors → segments → companies, linked many-to-many via company_segments (a company can compete in several segments)", fontsize=11, color=SOFT)
 ax.text(12.9, 19.75, "CRM / pipeline — separate domain", fontsize=11, color=SOFT, fontweight="bold")
-ax.text(12.9, 8.6, "Not joined to the competitive data in v1\n(AI-enrichment matching arrives in M2\nvia companies.crm_company_id / origin).", fontsize=9.5, color=MUTE, style="italic", va="top")
+ax.text(12.9, 9.0, "M2: companies.origin (csv|crm|ai) + crm_company_id\nlink AI-found competitors back to the CRM.\nai_enrichment logs each market-research run.", fontsize=9.5, color=MUTE, style="italic", va="top")
 
 ly = 1.2
 for i, (lab, c) in enumerate([("PK", PK), ("FK / ref", FK), ("jsonb", JSONB), ("column", SOFT)]):

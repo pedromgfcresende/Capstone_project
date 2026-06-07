@@ -58,13 +58,19 @@ def company_link_out(link: CompanySegment) -> dict:
 def company_matrix_out(c: Company) -> dict:
     """Company-level view + its segment memberships (matrix source)."""
     segs = sorted(c.links, key=lambda l: (l.segment.title if l.segment else ""))
+    extra = c.extra or {}
     return {
         "id": str(c.id),
         "name": c.name,
         "geography": c.geography,
         "fundRound": c.funding_status,
         "founded": c.founded,
+        "description": c.description,
         "origin": c.origin,
+        "inCrm": c.crm_company_id is not None,
+        "why": extra.get("why"),
+        "confidence": extra.get("confidence"),
+        "sources": extra.get("sources", []),
         "focal": any(l.focal for l in c.links),
         "segments": [
             {
@@ -143,8 +149,28 @@ def sector_out(s: Sector, *, with_segments: bool = True, with_companies: bool = 
         out["segments"] = [segment_out(seg) for seg in s.segments]
         out["workspaces"] = out["segments"]  # legacy alias (frontend transitioning)
     if with_companies:
-        out["companies"] = [company_matrix_out(c) for c in s.companies]
+        comps = list(s.companies)
+        out["companies"] = [company_matrix_out(c) for c in comps]
+        out["stats"] = {
+            "companies": len(comps),
+            "aiCompanies": sum(1 for c in comps if c.origin == "ai"),
+            "inCrm": sum(1 for c in comps if c.crm_company_id is not None),
+        }
     return out
+
+
+def enrichment_out(e) -> dict:
+    return {
+        "id": str(e.id),
+        "status": e.status,
+        "queries": (e.query_plan or {}).get("queries", []),
+        "competitors": (e.result or {}).get("competitors", []),
+        "createdCount": (e.result or {}).get("created", 0),
+        "fetchMethods": (e.result or {}).get("fetch_methods", {}),
+        "model": e.model,
+        "error": e.error,
+        "generatedAt": e.created_at.isoformat() if e.created_at else None,
+    }
 
 
 # ── CRM ───────────────────────────────────────────────────────────────────

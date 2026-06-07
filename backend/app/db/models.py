@@ -229,3 +229,22 @@ class Upload(Base, TimestampMixin):
     sector_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("sectors.id", ondelete="SET NULL")
     )
+
+
+# ── AI enrichment (M2): AI-discovered competitors not (yet) in the CRM ─────
+
+
+class AiEnrichment(Base, TimestampMixin):
+    __tablename__ = "ai_enrichment"
+
+    id: Mapped[uuid.UUID] = _pk()
+    sector_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("sectors.id", ondelete="CASCADE"), index=True
+    )
+    focal_company_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    segment_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|done|failed
+    query_plan: Mapped[dict | None] = mapped_column(JSONB)  # {queries: [...]}
+    result: Mapped[dict | None] = mapped_column(JSONB)  # {competitors: [...]} with provenance
+    model: Mapped[str | None] = mapped_column(String(100))
+    error: Mapped[str | None] = mapped_column(Text)

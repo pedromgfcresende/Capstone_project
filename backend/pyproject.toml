@@ -17,6 +17,9 @@ dependencies = [
     "langchain>=1.3.4",
     "langchain-anthropic>=1.4.4",
     "langchain-openai>=1.2.2",
+    "tavily-python>=0.7.25",
+    "trafilatura>=2.0.0",
+    "playwright>=1.60.0",
 ]
 
 [dependency-groups]
