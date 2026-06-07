@@ -9,7 +9,7 @@ async function get(path) {
 
 export const getSectors = () => get('/sectors')
 export const getSector = (id) => get(`/sectors/${id}`)
-export const getWorkspace = (id) => get(`/workspaces/${id}`)
+export const getSegment = (id) => get(`/segments/${id}`)
 
 async function send(method, path, body) {
   const res = await fetch(BASE + path, {
@@ -25,8 +25,8 @@ async function send(method, path, body) {
   return res.json()
 }
 
-export const synthesizeWorkspace = (id) => send('POST', `/workspaces/${id}/synthesize`)
-export const patchWorkspace = (id, body) => send('PATCH', `/workspaces/${id}`, body)
+export const synthesizeSegment = (id) => send('POST', `/segments/${id}/synthesize`)
+export const patchSegment = (id, body) => send('PATCH', `/segments/${id}`, body)
 
 export const synthesizeSector = (id) => send('POST', `/sectors/${id}/synthesize`)
 export const askSector = (id, question) => send('POST', `/sectors/${id}/ask`, { question })
@@ -45,13 +45,16 @@ export const getCrmCompanies = (params = {}) => {
   return get('/crm/companies' + (qs ? `?${qs}` : ''))
 }
 
-export async function uploadCompetitor({ file, title, sectorId, sectorLabel }) {
+// Competitor CSV → builds/extends a Sector (segments derived from the Segment column).
+export async function uploadCompetitor({ file, sectorLabel }) {
   const fd = new FormData()
   fd.append('file', file)
-  fd.append('title', title)
-  if (sectorId) fd.append('sector_id', sectorId)
-  if (sectorLabel) fd.append('sector_label', sectorLabel)
+  fd.append('sector_label', sectorLabel)
   const res = await fetch(BASE + '/uploads/competitor', { method: 'POST', body: fd })
-  if (!res.ok) throw new Error(`upload failed: ${res.status}`)
+  if (!res.ok) {
+    let detail = res.status
+    try { detail = (await res.json()).detail || detail } catch { /* ignore */ }
+    throw new Error(typeof detail === 'string' ? detail : `upload failed: ${res.status}`)
+  }
   return res.json()
 }

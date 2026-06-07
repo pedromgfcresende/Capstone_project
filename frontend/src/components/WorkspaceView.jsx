@@ -6,7 +6,7 @@ import ComparativeTab from './tabs/ComparativeTab'
 import DifferentiationTab from './tabs/DifferentiationTab'
 import SourcesTab from './tabs/SourcesTab'
 import SynthesisPanel from './SynthesisPanel'
-import { getWorkspace, synthesizeWorkspace } from '../api/client'
+import { getSegment, synthesizeSegment } from '../api/client'
 
 const TABS = [
   { id: 'summary', label: 'AI Analysis' },
@@ -24,7 +24,7 @@ export default function WorkspaceView({ workspace, sector }) {
   const [error, setError] = useState(null)
 
   const load = useCallback(() => {
-    getWorkspace(workspace.id).then(setDetail).catch((e) => setError(e.message))
+    getSegment(workspace.id).then(setDetail).catch((e) => setError(e.message))
   }, [workspace.id])
 
   useEffect(() => { setDetail(null); setError(null); load() }, [load])
@@ -35,7 +35,7 @@ export default function WorkspaceView({ workspace, sector }) {
   const runSynthesis = async () => {
     setBusy(true); setError(null)
     try {
-      const updated = await synthesizeWorkspace(workspace.id)
+      const updated = await synthesizeSegment(workspace.id)
       setDetail(updated)
       setActiveTab('summary')
     } catch (e) {
@@ -52,7 +52,7 @@ export default function WorkspaceView({ workspace, sector }) {
       <div className="flex items-center justify-between px-8 py-4 border-b border-rule bg-bg-card shrink-0">
         <div>
           <div className="font-mono text-[9px] text-ink-mute uppercase tracking-[0.12em] mb-1">
-            {sector?.label} · Workspace
+            {sector?.label} · Segment
           </div>
           <h1 className="font-serif text-[20px] font-semibold tracking-tight text-ink">
             {ws.title}
@@ -94,14 +94,22 @@ export default function WorkspaceView({ workspace, sector }) {
 
       {/* Tab content */}
       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
-        {activeTab === 'summary' && (
-          <SynthesisPanel workspaceId={workspace.id} synthesis={synthesis} keyInsight={ws.keyInsight} />
+        {!detail && !error ? (
+          <div className="flex-1 flex items-center justify-center font-sans text-[13px] text-ink-mute">
+            Loading workspace…
+          </div>
+        ) : (
+          <>
+            {activeTab === 'summary' && (
+              <SynthesisPanel workspaceId={workspace.id} synthesis={synthesis} keyInsight={ws.keyInsight} />
+            )}
+            {activeTab === 'overview' && <OverviewTab workspace={ws} sector={sector} />}
+            {activeTab === 'players' && <PlayersTab workspace={ws} sector={sector} />}
+            {activeTab === 'comparative' && <ComparativeTab workspace={ws} sector={sector} />}
+            {activeTab === 'differentiation' && <DifferentiationTab workspace={ws} sector={sector} />}
+            {activeTab === 'sources' && <SourcesTab workspace={ws} sector={sector} />}
+          </>
         )}
-        {activeTab === 'overview' && <OverviewTab workspace={ws} sector={sector} />}
-        {activeTab === 'players' && <PlayersTab workspace={ws} sector={sector} />}
-        {activeTab === 'comparative' && <ComparativeTab workspace={ws} sector={sector} />}
-        {activeTab === 'differentiation' && <DifferentiationTab workspace={ws} sector={sector} />}
-        {activeTab === 'sources' && <SourcesTab workspace={ws} sector={sector} />}
       </div>
 
     </div>

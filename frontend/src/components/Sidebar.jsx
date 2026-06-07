@@ -182,7 +182,7 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
               <button
                 onClick={e => { e.stopPropagation(); startNewWorkspace(sector.id) }}
                 className="opacity-0 group-hover:opacity-100 shrink-0 p-0.5 bg-transparent border-0 text-ink-mute hover:text-ink cursor-pointer transition-all"
-                title="New workspace"
+                title="New segment"
               >
                 <Plus size={11} />
               </button>
@@ -191,7 +191,7 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
             {expanded[sector.id] && (
               <div className="ml-4 mt-0.5 space-y-0.5">
                 {sector.workspaces.length === 0 && newWsName?.sectorId !== sector.id && (
-                  <div className="px-3 py-1.5 font-sans text-[11px] text-ink-mute italic">No workspaces yet</div>
+                  <div className="px-3 py-1.5 font-sans text-[11px] text-ink-mute italic">No segments yet</div>
                 )}
                 {sector.workspaces.map(ws => (
                   <div key={ws.id}>
@@ -253,7 +253,7 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
                         if (e.key === 'Escape') setNewWsName(null)
                       }}
                       onBlur={() => commitNewWorkspace(sector.id)}
-                      placeholder="Workspace name…"
+                      placeholder="Segment name…"
                       className="flex-1 bg-transparent border-0 outline-none font-sans text-[12px] text-ink placeholder:text-ink-mute"
                     />
                   </div>

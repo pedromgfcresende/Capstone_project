@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
-import { Plus, ArrowRight, Upload, Search, X, Database } from 'lucide-react'
+import { ArrowRight, Upload, Search, X, Database } from 'lucide-react'
 
-export default function LandingPage({ sectors, onSelect, onCreateSector, onNewWorkspace, onOpenCrm }) {
+export default function LandingPage({ sectors, onSelect, onNewSector, onOpenCrm, loadError }) {
   const [query, setQuery] = useState('')
 
   const searchResults = useMemo(() => {
@@ -54,6 +54,12 @@ export default function LandingPage({ sectors, onSelect, onCreateSector, onNewWo
           Map a new market or pick up where you left off.
         </p>
 
+        {loadError && (
+          <div className="mb-6 font-sans text-[12.5px] text-accent-deep bg-accent-soft border border-accent-soft rounded-lg px-4 py-2.5">
+            Couldn’t reach the API ({loadError}). Is the backend running on :8000?
+          </div>
+        )}
+
         {/* Global search */}
         <div className="relative mb-4">
           <div className="flex items-center gap-2.5 px-4 py-3 bg-white border border-rule rounded-lg focus-within:border-ink-mute transition-colors">
@@ -101,38 +107,21 @@ export default function LandingPage({ sectors, onSelect, onCreateSector, onNewWo
         {/* Primary actions */}
         <div className="flex flex-col gap-3 mb-10">
           <button
-            onClick={onCreateSector}
+            onClick={onNewSector}
             className="flex items-center gap-3 px-5 py-4 bg-ink text-white rounded-lg font-sans text-[13.5px] font-semibold transition-all cursor-pointer border-0 text-left group"
             onMouseEnter={e => e.currentTarget.style.background = '#e85d3b'}
             onMouseLeave={e => e.currentTarget.style.background = '#1a1a1a'}
           >
             <div className="w-7 h-7 rounded bg-white/15 flex items-center justify-center shrink-0">
-              <Plus size={14} />
+              <Upload size={14} />
             </div>
             <div className="flex-1">
               <div>Create a new sector</div>
               <div className="font-sans text-[11px] font-normal opacity-60 mt-0.5">
-                Start fresh — describe a market and let the AI build the landscape
+                Import a competitor-analysis CSV — segments &amp; companies are built from it
               </div>
             </div>
             <ArrowRight size={15} className="opacity-40 group-hover:opacity-80 transition-opacity" />
-          </button>
-
-          {/* Create workspace — opens the CSV upload flow */}
-          <button
-            onClick={onNewWorkspace}
-            className="w-full flex items-center gap-3 px-5 py-4 bg-white border border-rule rounded-lg font-sans text-[13.5px] font-semibold transition-all cursor-pointer text-left group hover:border-ink-mute"
-          >
-            <div className="w-7 h-7 rounded bg-bg flex items-center justify-center shrink-0 border border-rule">
-              <Upload size={14} className="text-ink-soft" />
-            </div>
-            <div className="flex-1 text-ink">
-              <div>Create a new workspace</div>
-              <div className="font-sans text-[11px] font-normal text-ink-mute mt-0.5">
-                Upload a competitor-analysis CSV to build a competitive landscape
-              </div>
-            </div>
-            <ArrowRight size={15} className="text-ink-mute opacity-40 group-hover:opacity-80 transition-opacity" />
           </button>
 
           {/* Browse the CRM pipeline */}

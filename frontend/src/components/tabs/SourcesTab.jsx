@@ -1,6 +1,17 @@
 import { useState } from 'react'
 import { Pencil, Plus, X, ExternalLink } from 'lucide-react'
-import { segmentSources, TYPE_COLORS, STATUS_COLORS, TYPE_LIST, LEVEL_LIST } from '../../data/segmentSources'
+
+const TYPE_COLORS = {
+  AI: { bg: '#f0ede8', text: '#8a8580' },
+  Primary: { bg: '#d4edda', text: '#2d6a3f' },
+  Secondary: { bg: '#e8f0fe', text: '#2a5fd4' },
+}
+const STATUS_COLORS = {
+  Verified: { bg: '#d4edda', text: '#2d6a3f' },
+  Unverified: { bg: '#f0ede8', text: '#8a8580' },
+}
+const TYPE_LIST = ['AI', 'Primary', 'Secondary']
+const LEVEL_LIST = ['L1', 'L2', 'L3']
 
 const GRID = '1fr 280px 110px 56px 110px 130px 28px'
 
@@ -42,7 +53,21 @@ function SegmentedFilter({ options, value, onChange }) {
 }
 
 export default function SourcesTab({ workspace }) {
-  const [rows, setRows] = useState(() => (segmentSources[workspace.id] || []).map(r => ({ ...r })))
+  // Seed the evidence register from the AI synthesis claims + their verification status.
+  const [rows, setRows] = useState(() => {
+    const claims = workspace.synthesis?.sources?.claims || []
+    const verifs = workspace.synthesis?.verifications || {}
+    return claims.map(c => ({
+      id: c.key,
+      claim: c.text,
+      source: 'AI synthesis',
+      url: '',
+      type: 'AI',
+      level: 'L1',
+      status: verifs[c.key] === 'verified' ? 'Verified' : 'Unverified',
+      location: '',
+    }))
+  })
   const [levelFilter, setLevelFilter] = useState(null)
   const [statusFilter, setStatusFilter] = useState(null)
 

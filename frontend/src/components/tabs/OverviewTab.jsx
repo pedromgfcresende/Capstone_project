@@ -1,7 +1,25 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Zap, ArrowUpRight } from 'lucide-react'
-import { segmentOverview, FALLBACK_OVERVIEW } from '../../data/segmentOverview'
+import { FALLBACK_OVERVIEW } from '../../data/segmentOverview'
 import { VerifyDot, VerifyLegend, useVerifyMap } from '../VerifyDot'
+
+// Map the AI synthesis market block (snake_case) onto the tab's shape.
+function marketToOverview(workspace) {
+  const syn = workspace.synthesis
+  const m = syn?.overview?.market
+  if (!m) return FALLBACK_OVERVIEW
+  return {
+    ...FALLBACK_OVERVIEW,
+    thesis: syn.overview.text || '',
+    tam: m.tam, sam: m.sam, som: m.som, cagr: m.cagr,
+    adoptionStage: m.adoption_stage,
+    adoptionEvidence: m.adoption_evidence,
+    tailwinds: m.tailwinds || [],
+    headwinds: m.headwinds || [],
+    whyNow: m.why_now || [],
+    regulatory: m.regulatory || [],
+  }
+}
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -65,7 +83,8 @@ const STAGE_POSITION = { 'Early Adopters': 15, 'Early Majority': 42, 'Late Major
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function OverviewTab({ workspace }) {
-  const d = segmentOverview[workspace.id] || FALLBACK_OVERVIEW
+  const d = marketToOverview(workspace)
+  const hasMarket = !!workspace.synthesis?.overview?.market
   const [expandedExit, setExpandedExit] = useState(null)
   const sizeVerify = useVerifyMap()
   const regVerify = useVerifyMap()
@@ -76,6 +95,19 @@ export default function OverviewTab({ workspace }) {
   return (
     <div className="flex-1 overflow-y-auto bg-bg">
       <div className="px-8 py-8 max-w-[900px] mx-auto flex flex-col gap-8">
+
+        {/* AI-estimated banner */}
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-rule bg-accent-soft/40"
+          style={{ background: hasMarket ? '#fdf6f2' : '#fff' }}>
+          <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-accent-deep">
+            {hasMarket ? 'AI-estimated market read — verify before use' : 'No market read yet'}
+          </span>
+          {!hasMarket && (
+            <span className="font-sans text-[12px] text-ink-mute">
+              · click <span className="font-semibold text-ink">Synthesise</span> to generate market sizing & signals
+            </span>
+          )}
+        </div>
 
         {/* ── 1. Market Snapshot ── */}
         <div className="bg-white border border-rule rounded-lg p-6 flex flex-col gap-4">

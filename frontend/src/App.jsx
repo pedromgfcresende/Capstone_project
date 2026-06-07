@@ -3,7 +3,6 @@ import Sidebar from './components/Sidebar'
 import { PanelLeftOpen } from 'lucide-react'
 import SectorCanvas from './components/SectorCanvas'
 import SeedScreen from './components/SeedScreen'
-import GeneratingState from './components/GeneratingState'
 import WorkspaceView from './components/WorkspaceView'
 import LandingPage from './components/LandingPage'
 import ConceptMemo from './components/ConceptMemo'
@@ -16,8 +15,6 @@ export default function App() {
   const [loadError, setLoadError] = useState(null)
   const [selected, setSelected] = useState(null)
   const sidebarRef = useRef(null)
-  const [sourcesOpen, setSourcesOpen] = useState(false)
-  const [workspaceStates, setWorkspaceStates] = useState({})
   const [conceptOpen, setConceptOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
 
@@ -29,35 +26,20 @@ export default function App() {
   }, [])
 
   const getSector = (id) => sectors.find(s => s.id === id)
-  const getWorkspace = (sectorId, wsId) => {
-    const sector = getSector(sectorId)
-    return sector?.workspaces.find(w => w.id === wsId)
-  }
+  const getSegment = (sectorId, segId) => getSector(sectorId)?.segments.find(w => w.id === segId)
 
-  const handleGenerate = (wsId, seedData) => {
-    setWorkspaceStates(p => ({ ...p, [wsId]: { status: 'generating', seedData } }))
-  }
+  const startNewSector = () => setSelected({ type: 'newSector' })
 
-  const handleGenerateDone = (wsId) => {
-    setWorkspaceStates(p => ({ ...p, [wsId]: { ...p[wsId], status: 'ready' } }))
-  }
-
-  const startNewWorkspace = () => setSelected({ type: 'newWorkspace' })
-
-  // After a competitor CSV upload creates a real workspace: refetch and select it.
-  const handleWorkspaceCreated = async (created) => {
+  // After a competitor CSV upload builds a Sector: refetch and open it.
+  const handleSectorCreated = async (created) => {
     try {
       const data = await getSectors()
       setSectors(data)
-      setSelected({ type: 'workspace', id: created.id, sectorId: created.sectorId })
+      setSelected({ type: 'sector', id: created.id })
     } catch (e) {
       setLoadError(e.message)
     }
   }
-
-  const wsState = selected?.type === 'workspace'
-    ? workspaceStates[selected.id]
-    : null
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg">
@@ -90,23 +72,25 @@ export default function App() {
       <div className="flex-1 flex min-w-0">
 
         {!selected && (
-          <LandingPage
-            sectors={sectors}
-            onSelect={setSelected}
-            onCreateSector={() => sidebarRef.current?.triggerNewSector()}
-            onCreateWorkspace={startNewWorkspace}
-            onNewWorkspace={startNewWorkspace}
-            onOpenCrm={() => setSelected({ type: 'crm' })}
-          />
+          loading ? (
+            <div className="flex-1 flex items-center justify-center font-sans text-[13px] text-ink-mute">Loading…</div>
+          ) : (
+            <LandingPage
+              sectors={sectors}
+              onSelect={setSelected}
+              onNewSector={startNewSector}
+              onOpenCrm={() => setSelected({ type: 'crm' })}
+              loadError={loadError}
+            />
+          )
         )}
 
         {selected?.type === 'crm' && <CrmView />}
 
-        {selected?.type === 'newWorkspace' && (
+        {selected?.type === 'newSector' && (
           <SeedScreen
-            workspace={{ title: '' }}
             sector={null}
-            onCreated={handleWorkspaceCreated}
+            onCreated={handleSectorCreated}
             onCancel={() => setSelected(null)}
           />
         )}
@@ -114,52 +98,16 @@ export default function App() {
         {selected?.type === 'sector' && (
           <SectorCanvas
             sector={getSector(selected.id)}
-            workspaceStates={workspaceStates}
             onSelect={setSelected}
-            onToggleSources={() => setSourcesOpen(o => !o)}
             onSectorUpdated={(s) => setSectors(prev => prev.map(x => x.id === s.id ? { ...x, ...s } : x))}
           />
         )}
 
         {selected?.type === 'workspace' && (() => {
           const sector = getSector(selected.sectorId)
-          const workspace = getWorkspace(selected.sectorId, selected.id)
-          if (!workspace) return null
-
-          // A workspace loaded from the API may already be 'ready' (has companies);
-          // local seed/generating state takes precedence when present.
-          const effectiveStatus =
-            wsState?.status || (workspace.status === 'ready' ? 'ready' : 'seed')
-
-          if (effectiveStatus === 'seed') {
-            return (
-              <SeedScreen
-                workspace={workspace}
-                sector={sector}
-                onCreated={handleWorkspaceCreated}
-              />
-            )
-          }
-
-          if (effectiveStatus === 'generating') {
-            return (
-              <GeneratingState
-                workspace={workspace}
-                onDone={() => handleGenerateDone(selected.id)}
-              />
-            )
-          }
-
-          if (effectiveStatus === 'ready') {
-            return (
-              <WorkspaceView
-                workspace={workspace}
-                sector={sector}
-                seedData={wsState?.seedData}
-                onToggleSources={() => setSourcesOpen(o => !o)}
-              />
-            )
-          }
+          const segment = getSegment(selected.sectorId, selected.id)
+          if (!segment) return null
+          return <WorkspaceView workspace={segment} sector={sector} />
         })()}
 
         {selected?.type === 'company' && (
