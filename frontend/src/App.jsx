@@ -28,6 +28,11 @@ export default function App() {
   const getSector = (id) => sectors.find(s => s.id === id)
   const getSegment = (sectorId, segId) => getSector(sectorId)?.segments.find(w => w.id === segId)
 
+  const reloadSectors = async () => {
+    try { setSectors(await getSectors()) } catch (e) { setLoadError(e.message) }
+  }
+  const handleSectorDeleted = async () => { setSelected(null); await reloadSectors() }
+
   const startNewSector = () => setSelected({ type: 'newSector' })
 
   // After a competitor CSV upload builds a Sector: refetch and open it.
@@ -100,6 +105,7 @@ export default function App() {
             sector={getSector(selected.id)}
             onSelect={setSelected}
             onSectorUpdated={(s) => setSectors(prev => prev.map(x => x.id === s.id ? { ...x, ...s } : x))}
+            onDeleted={handleSectorDeleted}
           />
         )}
 
@@ -107,7 +113,7 @@ export default function App() {
           const sector = getSector(selected.sectorId)
           const segment = getSegment(selected.sectorId, selected.id)
           if (!segment) return null
-          return <WorkspaceView workspace={segment} sector={sector} />
+          return <WorkspaceView workspace={segment} sector={sector} onSectorsChanged={reloadSectors} />
         })()}
 
         {selected?.type === 'company' && (

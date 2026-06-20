@@ -1,6 +1,7 @@
-import { useMemo } from 'react'
-import { ExternalLink, Link2, FileText } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ExternalLink, Link2, FileText, Sparkles, RefreshCw } from 'lucide-react'
 import { VerifyDot, VerifyLegend, useVerifyMap } from '../VerifyDot'
+import { collectSegmentSources } from '../../api/client'
 
 // ── Sources ───────────────────────────────────────────────────────────────────
 // Direct links only — the specific public pages where each company's data was
@@ -28,8 +29,9 @@ function companySources(co) {
   return out.filter(s => s.url && !seen.has(s.url) && seen.add(s.url))
 }
 
-export default function SourcesTab({ workspace }) {
+export default function SourcesTab({ workspace, onReload }) {
   const verify = useVerifyMap()
+  const [collecting, setCollecting] = useState(false)
   const withSources = useMemo(
     () => (workspace.companies || [])
       .map(co => ({ co, sources: companySources(co) }))
@@ -38,6 +40,12 @@ export default function SourcesTab({ workspace }) {
   )
 
   const total = withSources.reduce((n, x) => n + x.sources.length, 0)
+
+  const collect = async () => {
+    setCollecting(true)
+    try { await collectSegmentSources(workspace.id); onReload?.() }
+    finally { setCollecting(false) }
+  }
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-bg">
@@ -48,7 +56,18 @@ export default function SourcesTab({ workspace }) {
           <span className="font-mono text-[10px] uppercase tracking-[0.13em] text-ink-soft">Sources · direct links</span>
           <span className="font-mono text-[10px] text-ink-mute">· {total} link{total !== 1 ? 's' : ''} across {withSources.length} compan{withSources.length === 1 ? 'y' : 'ies'}</span>
         </div>
-        <VerifyLegend />
+        <div className="flex items-center gap-3">
+          <VerifyLegend />
+          <button
+            onClick={collect}
+            disabled={collecting}
+            title="Deep-research direct source links for every company in this segment"
+            className="flex items-center gap-1.5 font-sans text-[11.5px] font-medium px-2.5 py-1.5 rounded-md border border-rule bg-white text-ink-soft hover:text-ink hover:border-ink-mute transition-all cursor-pointer disabled:opacity-50"
+          >
+            {collecting ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} className="text-accent" />}
+            {collecting ? 'Researching…' : 'Collect sources'}
+          </button>
+        </div>
       </div>
 
       {/* Body */}

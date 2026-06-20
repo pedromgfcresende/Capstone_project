@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Search, X, ExternalLink, ChevronLeft, ChevronRight, Sparkles, RefreshCw, Upload, Check } from 'lucide-react'
-import { getCrmCompanies, getCrmFacets, analyseCrmCompany, uploadCrmReconcile } from '../api/client'
+import { getCrmCompanies, getCrmFacets, analyseCrmCompany, uploadCrmReconcile, setCompanyPipeline } from '../api/client'
 
 const PAGE = 25
 const fmtEur = (n) => (n == null ? '—' : n >= 1e6 ? `€${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `€${Math.round(n / 1e3)}k` : `€${n}`)
@@ -45,6 +45,13 @@ export default function CrmView({ onAnalysed }) {
 
   const onFilter = (fn) => { setOffset(0); fn() }
 
+  const togglePipeline = async (id, current) => {
+    try {
+      const updated = await setCompanyPipeline(id, !current)
+      setData(d => ({ ...d, items: d.items.map(x => x.id === id ? { ...x, inPipeline: updated.inPipeline } : x) }))
+    } catch { /* ignore */ }
+  }
+
   const onUpload = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -69,7 +76,7 @@ export default function CrmView({ onAnalysed }) {
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-bg">
       {/* Header */}
-      <div className="px-8 py-4 border-b border-rule bg-bg-card shrink-0 flex items-start justify-between gap-4">
+      <div className="pl-8 pr-28 py-4 border-b border-rule bg-bg-card shrink-0 flex items-start justify-between gap-4">
         <div>
           <div className="font-mono text-[9px] text-ink-mute uppercase tracking-[0.15em] mb-0.5">Deal Pipeline · Affinity CRM</div>
           <h1 className="font-serif text-[20px] font-semibold tracking-tight text-ink">
@@ -152,7 +159,7 @@ export default function CrmView({ onAnalysed }) {
         <table className="w-full border-collapse">
           <thead className="sticky top-0 bg-bg z-10">
             <tr className="border-b border-rule">
-              {['Company', 'Country', 'Stage', 'Funding', ''].map((h, i) => (
+              {['Company', 'Country', 'Stage', 'Funding', 'Pipeline', ''].map((h, i) => (
                 <th key={i} className="text-left font-mono text-[8.5px] uppercase tracking-[0.1em] text-ink-mute px-4 py-2.5 font-medium">{h}</th>
               ))}
             </tr>
@@ -177,6 +184,18 @@ export default function CrmView({ onAnalysed }) {
                 <td className="px-4 py-2.5 font-mono text-[11.5px] text-ink-soft">{fmtEur(c.totalFundingEur)}</td>
                 <td className="px-4 py-2.5">
                   <button
+                    onClick={() => togglePipeline(c.id, c.inPipeline !== false)}
+                    title="Toggle pipeline membership"
+                    className="font-mono text-[8.5px] uppercase tracking-[0.05em] px-2 py-0.5 rounded cursor-pointer border transition-all"
+                    style={c.inPipeline !== false
+                      ? { background: '#d4edda', color: '#2d6a3f', borderColor: '#bfe3c8' }
+                      : { background: '#f0ede8', color: '#8a8580', borderColor: '#e0dace' }}
+                  >
+                    {c.inPipeline !== false ? 'In Pipeline' : 'Not in Pipeline'}
+                  </button>
+                </td>
+                <td className="px-4 py-2.5">
+                  <button
                     onClick={() => analyse(c.id)}
                     disabled={analysingId !== null}
                     title="AI analyse: suggest sector + segment and research competitors"
@@ -188,7 +207,7 @@ export default function CrmView({ onAnalysed }) {
               </tr>
             ))}
             {!loading && data.items.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-10 text-center font-sans text-[13px] text-ink-mute italic">No companies match these filters.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-10 text-center font-sans text-[13px] text-ink-mute italic">No companies match these filters.</td></tr>
             )}
           </tbody>
         </table>

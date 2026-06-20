@@ -52,6 +52,18 @@ def patch_sector(sector_id: uuid.UUID, payload: SectorPatch, db: Session = Depen
     return sector_out(sector)
 
 
+@router.delete("/{sector_id}")
+def delete_sector(sector_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+    """Delete a sector and everything under it (segments, company links, synthesis)."""
+    sector = db.get(Sector, sector_id)
+    if sector is None:
+        raise HTTPException(status_code=404, detail="Sector not found")
+    label = sector.label
+    db.delete(sector)  # cascades to segments + companies + links
+    db.commit()
+    return {"deleted": True, "id": str(sector_id), "label": label}
+
+
 def _segments_payload(sector: Sector) -> list[dict]:
     out = []
     for seg in sector.segments:

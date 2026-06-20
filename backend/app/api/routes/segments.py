@@ -6,15 +6,45 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.api.serializers import company_link_out, segment_out
 from app.config import settings
 from app.db.models import Segment, SegmentSynthesis
 from app.db.session import get_db
+from app.services.research.sources import collect_company_sources
 from app.services.synthesis.chains import synthesize_segment
 from app.services.verification import verification_map
 
 router = APIRouter(prefix="/segments", tags=["segments"])
+
+
+def _collect_segment_sources(db: Session, seg: Segment, *, only_missing: bool = True) -> int:
+    """Deep-research direct source links for each company in the segment and save
+    them to company.extra.sources. Best-effort; returns how many companies got
+    (new) sources."""
+    n = 0
+    for link in seg.links:
+        c = link.company
+        extra = dict(c.extra or {})
+        if only_missing and extra.get("sources"):
+            continue
+        try:
+            links_found = collect_company_sources(
+                c.name,
+                domain=extra.get("website") or extra.get("domain"),
+                description=c.description,
+            )
+        except Exception:  # noqa: BLE001 - research is best-effort
+            links_found = []
+        if links_found:
+            extra["sources"] = links_found
+            c.extra = extra
+            flag_modified(c, "extra")
+            n += 1
+    if n:
+        db.commit()
+    return n
 
 
 def _verifs(db: Session, seg: Segment) -> dict[str, str]:
@@ -112,5 +142,25 @@ def synthesize(segment_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     seg.key_insight = result.key_insight
     seg.status = "ready"
     db.commit()
+
+    # deep-research direct source links per company for the Sources tab
+    _collect_segment_sources(db, seg, only_missing=True)
     db.refresh(seg)
     return segment_out(seg, with_synthesis=True, verifications=_verifs(db, seg))
+
+
+@router.post("/{segment_id}/collect-sources")
+def collect_sources(segment_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+    """Run per-company deep research and (re)populate direct source links for the
+    Sources tab, without re-running the full synthesis."""
+    seg = db.get(Segment, segment_id)
+    if seg is None:
+        raise HTTPException(status_code=404, detail="Segment not found")
+    if not seg.links:
+        raise HTTPException(status_code=400, detail="Segment has no companies")
+    count = _collect_segment_sources(db, seg, only_missing=False)
+    db.refresh(seg)
+    return {
+        "updated": count,
+        "segment": segment_out(seg, with_synthesis=True, verifications=_verifs(db, seg)),
+    }

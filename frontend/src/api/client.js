@@ -32,6 +32,12 @@ export const synthesizeSector = (id) => send('POST', `/sectors/${id}/synthesize`
 export const askSector = (id, question) => send('POST', `/sectors/${id}/ask`, { question })
 export const patchSector = (id, body) => send('PATCH', `/sectors/${id}`, body)
 export const enrichSector = (id, opts = {}) => send('POST', `/sectors/${id}/enrich`, opts)
+export const deleteSector = (id) => send('DELETE', `/sectors/${id}`)
+
+export const collectSegmentSources = (id) => send('POST', `/segments/${id}/collect-sources`)
+export const setCompanyPipeline = (id, inPipeline) => send('PATCH', `/crm/companies/${id}`, { inPipeline })
+export const moveCompanySegment = (companyId, fromSegmentId, toSegmentId) =>
+  send('POST', `/companies/${companyId}/move-segment`, { fromSegmentId, toSegmentId })
 
 export const getCrmFacets = () => get('/crm/facets')
 export const analyseCrmCompany = (id) => send('POST', `/crm/companies/${id}/analyse`)

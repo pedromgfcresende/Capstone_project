@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react'
-import { ArrowRight, Search, X, Sparkles, ChevronDown, ChevronUp, Send, Target, Radio, Layers, RefreshCw, Pencil } from 'lucide-react'
+import { ArrowRight, Search, X, Sparkles, ChevronDown, ChevronUp, Send, Target, Radio, Layers, RefreshCw, Pencil, Trash2, AlertTriangle } from 'lucide-react'
 import { segmentOverview, FALLBACK_OVERVIEW } from '../data/segmentOverview'
 import CompanyProfile from './CompanyProfile'
 import { VerifyDot, VerifyLegend, useVerifyMap } from './VerifyDot'
-import { synthesizeSector, askSector, patchSector, enrichSector } from '../api/client'
+import { synthesizeSector, askSector, patchSector, enrichSector, deleteSector } from '../api/client'
 
 const SIGNAL_COLORS = {
   'Funding':    { bg: '#d4edda', text: '#2d6a3f' },
@@ -163,7 +163,7 @@ function SectionHeader({ icon: Icon, label, count }) {
   )
 }
 
-export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
+export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDeleted }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [aiQuery, setAiQuery] = useState('')
   const [results, setResults] = useState([])
@@ -173,6 +173,8 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
   const [saveMsg, setSaveMsg] = useState('')
   const [enriching, setEnriching] = useState(false)
   const [enrichMsg, setEnrichMsg] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [profileCompany, setProfileCompany] = useState(null)
   const signalVerify = useVerifyMap()
   const aiVerify = useVerifyMap()
@@ -339,6 +341,18 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
     }
   }
 
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      await deleteSector(sector.id)
+      onDeleted?.(sector.id)
+    } catch (e) {
+      setSaveMsg(`Delete failed: ${e.message}`)
+      setDeleting(false)
+      setConfirmDelete(false)
+    }
+  }
+
   if (!sector) return (
     <div className="flex-1 flex items-center justify-center text-ink-mute font-sans text-[13px]">Select a sector from the sidebar</div>
   )
@@ -349,7 +363,7 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
     <div className="flex-1 flex flex-col min-h-0 bg-bg">
 
       {/* Header */}
-      <div className="flex items-center justify-between px-8 py-4 border-b border-rule shrink-0 bg-bg-card">
+      <div className="flex items-center justify-between pl-8 pr-28 py-4 border-b border-rule shrink-0 bg-bg-card">
         <div>
           <div className="font-mono text-[9px] text-ink-mute uppercase tracking-[0.15em] mb-0.5">Sector · Synthesis</div>
           <h1 className="font-serif text-[20px] font-semibold tracking-tight text-ink">{sector.label}</h1>
@@ -383,8 +397,44 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
             <RefreshCw size={11} className={resynth ? 'animate-spin' : ''} />
             {resynth ? 'Synthesising…' : 'Re-synthesise'}
           </button>
+          <button
+            onClick={() => setConfirmDelete(true)}
+            title="Delete this sector"
+            className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.1em] text-ink-mute hover:text-red-600 border border-rule hover:border-red-300 px-2.5 py-1.5 rounded transition-all cursor-pointer bg-bg-card"
+          >
+            <Trash2 size={11} />
+          </button>
         </div>
       </div>
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(21,6,59,0.35)' }}>
+          <div className="bg-white border border-rule rounded-xl shadow-xl w-[420px] overflow-hidden">
+            <div className="px-6 pt-6 pb-4 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: '#fde4dc' }}>
+                <AlertTriangle size={16} style={{ color: '#c04a22' }} />
+              </div>
+              <div>
+                <h3 className="font-serif text-[17px] font-semibold text-ink mb-1">Delete sector?</h3>
+                <p className="font-sans text-[12.5px] text-ink-soft leading-relaxed">
+                  Are you sure you want to delete <span className="font-semibold text-ink">{sector.label}</span>?
+                  This removes all of its segments, companies, and synthesis. This can’t be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-rule bg-bg-card">
+              <button onClick={() => setConfirmDelete(false)} disabled={deleting}
+                className="font-sans text-[12.5px] px-3.5 py-2 rounded-md border border-rule bg-white text-ink-soft hover:text-ink hover:border-ink-mute cursor-pointer transition-all disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="flex items-center gap-1.5 font-sans text-[12.5px] font-medium px-3.5 py-2 rounded-md border-0 bg-red-600 text-white hover:bg-red-700 cursor-pointer transition-all disabled:opacity-60">
+                {deleting ? <><RefreshCw size={12} className="animate-spin" /> Deleting…</> : <><Trash2 size={12} /> Delete</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto">
         <div className="px-8 py-7">

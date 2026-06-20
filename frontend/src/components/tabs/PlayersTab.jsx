@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { ChevronRight, ChevronDown, Sparkles } from 'lucide-react'
+import { moveCompanySegment } from '../../api/client'
 
 // ── Players Overview ──────────────────────────────────────────────────────────
 // A clean, signal-first table. No black-box priority score (removed by design —
@@ -65,9 +66,10 @@ function RoundBadge({ value }) {
   )
 }
 
-function PlayerRow({ player, showType, colTemplate, onCycleType, onDescribe }) {
+function PlayerRow({ player, showType, colTemplate, onCycleType, onDescribe, otherSegments, onMove }) {
   const [expanded, setExpanded] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [moving, setMoving] = useState(false)
 
   const expand = () => {
     setExpanded(e => !e)
@@ -123,18 +125,46 @@ function PlayerRow({ player, showType, colTemplate, onCycleType, onDescribe }) {
               <span className="font-mono text-[8px] uppercase tracking-[0.08em] not-italic mr-1.5">Note</span>{player.notes}
             </p>
           )}
+          {otherSegments.length > 0 && (
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              <span className="font-mono text-[8px] uppercase tracking-[0.08em] text-ink-mute">Move to segment</span>
+              <select
+                value=""
+                disabled={moving}
+                onChange={async (e) => {
+                  const to = e.target.value
+                  if (!to) return
+                  setMoving(true)
+                  try { await onMove(player.id, to) } finally { setMoving(false) }
+                }}
+                className="font-sans text-[11.5px] text-ink bg-white border border-rule rounded px-2 py-1 outline-none focus:border-ink-mute cursor-pointer disabled:opacity-50"
+              >
+                <option value="">{moving ? 'Moving…' : 'Choose segment…'}</option>
+                {otherSegments.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+              </select>
+            </div>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-export default function PlayersTab({ workspace }) {
+export default function PlayersTab({ workspace, sector, onMoved }) {
   const searchPath = workspace.searchPath || (workspace.focalCompany ? 'company' : 'sector')
   const showType = searchPath === 'company'
 
   const [overrides, setOverrides] = useState({})  // id -> { relationType?, description? }
   const [sortId, setSortId] = useState('round')
+
+  const otherSegments = (sector?.segments || sector?.workspaces || [])
+    .filter(s => s.id !== workspace.id)
+    .map(s => ({ id: s.id, title: s.title }))
+
+  const moveCompany = async (companyId, toSegmentId) => {
+    await moveCompanySegment(companyId, workspace.id, toSegmentId)
+    onMoved?.()
+  }
 
   const merged = useMemo(
     () => (workspace.companies || []).map(c => ({ ...c, ...overrides[c.id] })),
@@ -227,6 +257,8 @@ export default function PlayersTab({ workspace }) {
               colTemplate={colTemplate}
               onCycleType={cycleType}
               onDescribe={describe}
+              otherSegments={otherSegments}
+              onMove={moveCompany}
             />
           ))
         )}

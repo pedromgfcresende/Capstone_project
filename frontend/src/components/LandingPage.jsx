@@ -31,17 +31,9 @@ export default function LandingPage({ sectors, onSelect, onNewSector, onOpenCrm,
     <div className="flex-1 flex flex-col items-center justify-center bg-bg px-8">
       <div className="w-full max-w-[560px]">
 
-        {/* Brand mark */}
-        <div className="flex items-center gap-3 mb-8">
-          <XangeLogo size={34} radius={8} />
-          <div>
-            <div className="font-serif font-bold text-[18px] text-ink tracking-tight">
-              XAnge<span className="text-accent">.</span>
-            </div>
-            <div className="font-mono text-[9px] text-ink-mute uppercase tracking-[0.15em]">
-              Market Intelligence
-            </div>
-          </div>
+        {/* Brand mark — logo only */}
+        <div className="flex items-center mb-8">
+          <XangeLogo size={40} radius={9} />
         </div>
 
         {/* Heading */}
@@ -132,9 +124,6 @@ export default function LandingPage({ sectors, onSelect, onNewSector, onOpenCrm,
             </div>
             <div className="flex-1 text-ink">
               <div>Browse the deal pipeline</div>
-              <div className="font-sans text-[11px] font-normal text-ink-mute mt-0.5">
-                Search and filter XAnge's CRM (hot / pass / unknown leads)
-              </div>
             </div>
             <ArrowRight size={15} className="text-ink-mute opacity-40 group-hover:opacity-80 transition-opacity" />
           </button>

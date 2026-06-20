@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.db.models import Company, Sector
+from app.db.models import Company, CompanySegment, Sector, Segment
 from app.db.session import get_db
 from app.services.axes import parse_year
 from app.services.collect.registries import lookup_company_registry
@@ -42,6 +42,42 @@ def _append_source(extra: dict, field: str, collected: dict) -> None:
         "reliability": collected.get("reliability"),
     })
     extra["sources"] = srcs
+
+
+class MoveSegmentIn(BaseModel):
+    fromSegmentId: uuid.UUID
+    toSegmentId: uuid.UUID
+
+
+@router.post("/companies/{company_id}/move-segment")
+def move_segment(company_id: uuid.UUID, payload: MoveSegmentIn, db: Session = Depends(get_db)) -> dict:
+    """Reassign a company from one segment to another within the same sector."""
+    company = db.get(Company, company_id)
+    if company is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+    target = db.get(Segment, payload.toSegmentId)
+    if target is None or target.sector_id != company.sector_id:
+        raise HTTPException(status_code=400, detail="Target segment not in this company's sector")
+
+    from_link = (
+        db.query(CompanySegment)
+        .filter_by(company_id=company_id, segment_id=payload.fromSegmentId)
+        .first()
+    )
+    if from_link is None:
+        raise HTTPException(status_code=404, detail="Company is not in the source segment")
+
+    existing = (
+        db.query(CompanySegment)
+        .filter_by(company_id=company_id, segment_id=payload.toSegmentId)
+        .first()
+    )
+    if existing:
+        db.delete(from_link)  # already a member of the target — just leave the source
+    else:
+        from_link.segment_id = payload.toSegmentId  # carries tier/focal/notes over
+    db.commit()
+    return {"moved": True, "companyId": str(company_id), "toSegmentId": str(payload.toSegmentId)}
 
 
 @router.post("/companies/{company_id}/collect-registry")

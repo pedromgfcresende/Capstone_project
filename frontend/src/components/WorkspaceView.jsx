@@ -17,7 +17,7 @@ const TABS = [
   { id: 'sources', label: 'Sources' },
 ]
 
-export default function WorkspaceView({ workspace, sector }) {
+export default function WorkspaceView({ workspace, sector, onSectorsChanged }) {
   const [activeTab, setActiveTab] = useState('summary')
   const [detail, setDetail] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -49,7 +49,7 @@ export default function WorkspaceView({ workspace, sector }) {
     <div className="flex-1 flex flex-col min-h-0">
 
       {/* Header */}
-      <div className="flex items-center justify-between px-8 py-4 border-b border-rule bg-bg-card shrink-0">
+      <div className="flex items-center justify-between pl-8 pr-28 py-4 border-b border-rule bg-bg-card shrink-0">
         <div>
           <div className="font-mono text-[9px] text-ink-mute uppercase tracking-[0.12em] mb-1">
             {sector?.label} · Segment
@@ -104,10 +104,10 @@ export default function WorkspaceView({ workspace, sector }) {
               <SynthesisPanel workspaceId={workspace.id} synthesis={synthesis} keyInsight={ws.keyInsight} />
             )}
             {activeTab === 'overview' && <OverviewTab workspace={ws} sector={sector} />}
-            {activeTab === 'players' && <PlayersTab workspace={ws} sector={sector} />}
+            {activeTab === 'players' && <PlayersTab workspace={ws} sector={sector} onMoved={() => { load(); onSectorsChanged?.() }} />}
             {activeTab === 'comparative' && <ComparativeTab workspace={ws} sector={sector} />}
             {activeTab === 'differentiation' && <DifferentiationTab workspace={ws} sector={sector} />}
-            {activeTab === 'sources' && <SourcesTab workspace={ws} sector={sector} />}
+            {activeTab === 'sources' && <SourcesTab workspace={ws} sector={sector} onReload={load} />}
           </>
         )}
       </div>
