@@ -1,18 +1,28 @@
 @import "tailwindcss";
 
+/* XAnge brand palette (from xange.vc --x-* tokens):
+   lavender #b2bcff · deep indigo #15063b · beige #eee3dd · coral #ff9060 */
 @theme {
-  --color-bg: #f4f1ea;
-  --color-bg-card: #fbf9f4;
-  --color-ink: #1a1a1a;
-  --color-ink-soft: #4a4a4a;
-  --color-ink-mute: #8a8580;
-  --color-rule: #d8d2c5;
-  --color-rule-soft: #e7e2d6;
-  --color-accent: #e85d3b;
-  --color-accent-soft: #fce6dc;
-  --color-accent-deep: #b8401f;
-  --color-good: #4a7c59;
-  --color-warn: #c08a3a;
+  --color-bg: #eee3dd;          /* XAnge beige page background */
+  --color-bg-card: #f7f1ec;     /* warm off-white card */
+  --color-ink: #15063b;         /* XAnge deep indigo — primary ink */
+  --color-ink-soft: #4a4360;
+  --color-ink-mute: #8b8698;
+  --color-rule: #ddd4ca;
+  --color-rule-soft: #e8e0d7;
+
+  /* coral is the primary interactive accent (replaces the old orange) */
+  --color-accent: #ff7a45;
+  --color-accent-soft: #ffe5d8;
+  --color-accent-deep: #c0420c;
+
+  /* lavender + indigo are the brand colours (logo tile, dark nav blocks) */
+  --color-brand: #b2bcff;
+  --color-brand-soft: #e9ebff;
+  --color-brand-deep: #15063b;
+
+  --color-good: #007a29;        /* XAnge green */
+  --color-warn: #c0420c;
 
   --font-serif: 'Fraunces', Georgia, serif;
   --font-sans: 'Inter', -apple-system, sans-serif;
@@ -28,8 +38,8 @@ body {
   min-height: 100vh;
   margin: 0;
   background-image:
-    radial-gradient(circle at 20% 0%, rgba(232,93,59,0.04) 0%, transparent 40%),
-    radial-gradient(circle at 80% 100%, rgba(232,93,59,0.03) 0%, transparent 50%);
+    radial-gradient(circle at 20% 0%, rgba(178,188,255,0.10) 0%, transparent 42%),
+    radial-gradient(circle at 80% 100%, rgba(255,144,96,0.06) 0%, transparent 50%);
 }
 
 * { box-sizing: border-box; }

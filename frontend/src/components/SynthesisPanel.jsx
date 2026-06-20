@@ -66,7 +66,7 @@ export default function SynthesisPanel({ workspaceId, synthesis, keyInsight }) {
           <p className="font-serif text-[16px] text-ink leading-snug">{txt(synthesis.summary)}</p>
         </div>
         {keyInsight && (
-          <div className="px-6 py-4 border-t border-rule" style={{ background: 'linear-gradient(180deg,#fdf6f2,#fff)' }}>
+          <div className="px-6 py-4 border-t border-rule" style={{ background: 'linear-gradient(180deg,#fff1ea,#fff)' }}>
             <div className="flex items-center gap-2 mb-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-accent" />
               <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-accent-deep">Key insight</span>

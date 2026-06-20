@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useMemo } from 'react'
-import { ChevronDown, Hand, ShieldCheck, AlertCircle } from 'lucide-react'
+import { ChevronDown, Hand, ShieldCheck, AlertCircle, Database, Loader2 } from 'lucide-react'
+import { collectRegistry } from '../../api/client'
 
 // ── Structured 2x2 matrix ─────────────────────────────────────────────────────
 // All positioning comes from structured fields with transparent, published
@@ -22,7 +23,7 @@ const QUADRANTS = {
   employees: { tl: 'Bootstrapped scale', tr: 'Scaling', bl: 'Early · lean', br: 'Capital-efficient' },
 }
 
-const COLORS = { focal: { bg: '#f2a58e', border: '#e8896e' }, default: { bg: '#1a1a1a', border: '#1a1a1a' } }
+const COLORS = { focal: { bg: '#ff9060', border: '#ff7a45' }, default: { bg: '#15063b', border: '#15063b' } }
 
 // Bounded, monotonic placement centred on the cutoff (value==cutoff -> 50%).
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
@@ -58,6 +59,25 @@ export default function ComparativeTab({ workspace }) {
   const [verified, setVerified] = useState({})
   // manual placements: id -> {x,y}
   const [manual, setManual] = useState({})
+  // registry-collected fields: id -> { yearFounded, location, source }
+  const [collected, setCollected] = useState({})
+  const [collecting, setCollecting] = useState({})
+
+  const collect = async (id) => {
+    setCollecting(c => ({ ...c, [id]: true }))
+    try {
+      const res = await collectRegistry(id)
+      if (res.found) {
+        setCollected(c => ({ ...c, [id]: { yearFounded: res.company.yearFounded, location: res.company.location, source: res.collected?.sourceName } }))
+      } else {
+        setCollected(c => ({ ...c, [id]: { notFound: true } }))
+      }
+    } catch {
+      setCollected(c => ({ ...c, [id]: { notFound: true } }))
+    } finally {
+      setCollecting(c => ({ ...c, [id]: false }))
+    }
+  }
 
   const yAxis = Y_AXES[yMode]
   const quad = QUADRANTS[yMode]
@@ -67,7 +87,12 @@ export default function ComparativeTab({ workspace }) {
 
   // Classify every company: plotted, needs-verification, or missing-data.
   const classified = useMemo(() => {
-    return companies.map(co => {
+    return companies.map(raw => {
+      const got = collected[raw.id]
+      // registry collection backfills the founding year (and HQ)
+      const co = got && !got.notFound
+        ? { ...raw, yearFounded: got.yearFounded ?? raw.yearFounded, location: got.location ?? raw.location }
+        : raw
       const fund = co.fundingEur
       const yVal = co[yAxis.field]
       const hasBoth = fund != null && yVal != null
@@ -88,7 +113,7 @@ export default function ComparativeTab({ workspace }) {
       const y = manualPos ? manualPos.y : (yRaw != null ? clamp(100 - yRaw, 5, 95) : null)
       return { ...co, state, x, y, fund, yVal }
     })
-  }, [companies, yAxis, verified, manual, cfg])
+  }, [companies, yAxis, verified, manual, cfg, collected])
 
   const plotted = classified.filter(c => c.state === 'plotted' || c.state === 'manual')
   const offMatrix = classified.filter(c => c.state === 'missing' || c.state === 'unverified')
@@ -143,7 +168,7 @@ export default function ComparativeTab({ workspace }) {
                       key={a.id}
                       onClick={() => { setYMode(a.id); setMenuOpen(false) }}
                       className="w-full text-left px-4 py-2.5 font-sans text-[12.5px] hover:bg-bg transition-colors border-0 bg-transparent cursor-pointer"
-                      style={{ color: yMode === a.id ? '#1a1a1a' : '#6a6560', fontWeight: yMode === a.id ? 600 : 400 }}
+                      style={{ color: yMode === a.id ? '#15063b' : '#6a6560', fontWeight: yMode === a.id ? 600 : 400 }}
                     >
                       Funding × {a.label}
                     </button>
@@ -186,8 +211,8 @@ export default function ComparativeTab({ workspace }) {
           >
             {/* cutoff lines */}
             <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute top-1/2 left-0 right-0 border-t border-dashed" style={{ borderColor: '#e8896e' }} />
-              <div className="absolute left-1/2 top-0 bottom-0 border-l border-dashed" style={{ borderColor: '#e8896e' }} />
+              <div className="absolute top-1/2 left-0 right-0 border-t border-dashed" style={{ borderColor: '#ff7a45' }} />
+              <div className="absolute left-1/2 top-0 bottom-0 border-l border-dashed" style={{ borderColor: '#ff7a45' }} />
               <span className="absolute left-1/2 bottom-1 -translate-x-1/2 font-mono text-[8px] text-accent-deep bg-white/80 px-1 rounded">{fmtFunding(cfg.fundingCutoffEur)}</span>
               <span className="absolute top-1/2 left-1 -translate-y-1/2 font-mono text-[8px] text-accent-deep bg-white/80 px-1 rounded">{yMode === 'year' ? cfg.yearFoundedCutoff : cfg.employeeCutoff}</span>
             </div>
@@ -254,7 +279,7 @@ export default function ComparativeTab({ workspace }) {
             <span className="font-sans text-[11.5px] text-ink-soft">Competitor</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ background: '#f2a58e' }} />
+            <div className="w-3 h-3 rounded-full" style={{ background: '#ff9060' }} />
             <span className="font-sans text-[11.5px] text-ink-soft">Focal company</span>
           </div>
           <div className="flex items-center gap-2">
@@ -308,6 +333,20 @@ export default function ComparativeTab({ workspace }) {
                         >
                           <ShieldCheck size={11} className="text-good" /> Verify
                         </button>
+                      )}
+                      {missingY && yAxis.id === 'year' && !collected[co.id]?.notFound && (
+                        <button
+                          onClick={() => collect(co.id)}
+                          disabled={collecting[co.id]}
+                          className="flex items-center gap-1 font-sans text-[11px] font-medium px-2 py-1 rounded border border-rule bg-white text-ink-soft hover:text-ink hover:border-ink-mute transition-all cursor-pointer disabled:opacity-50"
+                          title="Look up founding year in official business registries (data.gouv.fr / Companies House)"
+                        >
+                          {collecting[co.id] ? <Loader2 size={11} className="animate-spin" /> : <Database size={11} className="text-accent" />}
+                          {collecting[co.id] ? 'Collecting…' : 'Collect founded'}
+                        </button>
+                      )}
+                      {collected[co.id]?.notFound && (
+                        <span className="font-sans text-[10px] text-ink-mute italic">no registry match</span>
                       )}
                       <button
                         onClick={() => placeManually(co.id)}

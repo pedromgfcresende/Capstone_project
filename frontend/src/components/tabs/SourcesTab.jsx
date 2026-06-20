@@ -1,5 +1,97 @@
-import { useState } from 'react'
-import { Pencil, Plus, X, ExternalLink } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Pencil, Plus, X, ExternalLink, ChevronDown, ChevronRight, Database, Globe, Loader2 } from 'lucide-react'
+import { getSources, collectMarketContext } from '../../api/client'
+
+const ACCESS_STYLE = {
+  'Fully accessible': { bg: '#d4edda', text: '#2d6a3f' },
+  'Partially accessible': { bg: '#f5edcf', text: '#8a6d1f' },
+  'Login / paywall limited': { bg: '#f0ede8', text: '#8a8580' },
+}
+
+function fmtNum(n) {
+  if (n == null) return '—'
+  if (n >= 1e12) return `${(n / 1e12).toFixed(2)}T`
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`
+  return Math.round(n).toLocaleString()
+}
+
+// Open-data collection panel: the source directory + a live World Bank pull.
+function CollectionPanel({ sectorId }) {
+  const [open, setOpen] = useState(true)
+  const [sources, setSources] = useState([])
+  const [ctx, setCtx] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => { getSources().then(setSources).catch(() => setSources([])) }, [])
+
+  const pullContext = async () => {
+    setBusy(true)
+    try { const r = await collectMarketContext(sectorId); setCtx(r.found ? r.marketContext : { none: true }) }
+    catch { setCtx({ none: true }) }
+    finally { setBusy(false) }
+  }
+
+  const live = sources.filter(s => s.live)
+
+  return (
+    <div className="px-8 py-4 border-b border-rule bg-bg-card shrink-0">
+      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 bg-transparent border-0 cursor-pointer p-0 mb-1">
+        {open ? <ChevronDown size={13} className="text-ink-mute" /> : <ChevronRight size={13} className="text-ink-mute" />}
+        <Database size={13} className="text-accent" />
+        <span className="font-mono text-[9px] uppercase tracking-[0.13em] text-ink-soft">Open-data collection sources</span>
+        <span className="font-mono text-[9px] text-ink-mute">· {live.length} live collectors</span>
+      </button>
+
+      {open && (
+        <div className="mt-3 flex flex-col gap-3">
+          {/* Market context (World Bank) */}
+          <div className="flex items-center gap-3 flex-wrap bg-white border border-rule rounded-lg px-4 py-2.5">
+            <Globe size={13} className="text-ink-mute shrink-0" />
+            <span className="font-sans text-[12px] font-medium text-ink">Market context</span>
+            {ctx && !ctx.none ? (
+              <span className="font-sans text-[11.5px] text-ink-soft">
+                {ctx.country}: pop <b>{fmtNum(ctx.population)}</b> · GDP <b>${fmtNum(ctx.gdpUsd)}</b> · GDP/cap <b>${fmtNum(ctx.gdpPerCapitaUsd)}</b>
+                <span className="text-ink-mute"> ({ctx.year}, {ctx.sourceName})</span>
+              </span>
+            ) : ctx?.none ? (
+              <span className="font-sans text-[11.5px] text-ink-mute italic">No World Bank match for this sector’s geography.</span>
+            ) : (
+              <span className="font-sans text-[11.5px] text-ink-mute italic">Pull population & GDP for this sector’s primary geography.</span>
+            )}
+            <button onClick={pullContext} disabled={busy}
+              className="ml-auto flex items-center gap-1 font-sans text-[11px] font-medium px-2.5 py-1 rounded border border-rule bg-white text-ink-soft hover:text-ink hover:border-ink-mute transition-all cursor-pointer disabled:opacity-50">
+              {busy ? <Loader2 size={11} className="animate-spin" /> : <Database size={11} className="text-accent" />}
+              {busy ? 'Pulling…' : 'Pull from World Bank'}
+            </button>
+          </div>
+
+          {/* Source directory */}
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: '1fr' }}>
+            {sources.map((s, i) => {
+              const a = ACCESS_STYLE[s.access] || ACCESS_STYLE['Login / paywall limited']
+              return (
+                <div key={i} className="flex items-center gap-3 bg-white border border-rule rounded-md px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-sans text-[12px] font-medium text-ink truncate">{s.name}</span>
+                      {s.live && <span className="font-mono text-[7.5px] uppercase tracking-[0.05em] text-good bg-[#d4edda] px-1 py-0.5 rounded shrink-0">live</span>}
+                    </div>
+                    <span className="font-mono text-[9.5px] text-ink-mute">{s.section} · {s.reliability}</span>
+                  </div>
+                  <span className="font-mono text-[8px] uppercase tracking-[0.06em] px-1.5 py-0.5 rounded shrink-0" style={{ background: a.bg, color: a.text }}>{s.access}</span>
+                  {s.url && !s.url.includes('[') && (
+                    <a href={s.url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-ink-mute hover:text-ink transition-colors"><ExternalLink size={11} /></a>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const TYPE_COLORS = {
   AI: { bg: '#f0ede8', text: '#8a8580' },
@@ -42,7 +134,7 @@ function SegmentedFilter({ options, value, onChange }) {
           <button key={opt.label} onClick={() => onChange(opt.value)}
             className="font-mono text-[9px] uppercase tracking-[0.08em] px-2.5 py-1.5 rounded border cursor-pointer transition-all"
             style={active
-              ? { background: '#1a1a1a', color: '#fff', borderColor: '#1a1a1a' }
+              ? { background: '#15063b', color: '#fff', borderColor: '#15063b' }
               : { background: '#faf9f7', color: '#8a8580', borderColor: '#ddd6cb' }}>
             {opt.label}
           </button>
@@ -92,6 +184,8 @@ export default function SourcesTab({ workspace }) {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-bg">
+
+      <CollectionPanel sectorId={workspace.sectorId} />
 
       {/* Stats + filters bar */}
       <div className="flex items-center justify-between gap-6 px-8 py-4 border-b border-rule bg-bg-card shrink-0 flex-wrap">

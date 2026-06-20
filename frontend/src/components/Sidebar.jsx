@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { Search, ChevronRight, ChevronDown, Plus, X, PanelLeftClose, Database } from 'lucide-react'
+import XangeLogo from './XangeLogo'
 
 const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSectors, onCollapse, onHome }, ref) {
   useImperativeHandle(ref, () => ({
@@ -71,14 +72,17 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
       <div className="px-4 pt-5 pb-4 border-b border-rule flex items-start justify-between">
         <button
           onClick={onHome}
-          className="text-left bg-transparent border-0 cursor-pointer p-0 group"
+          className="text-left bg-transparent border-0 cursor-pointer p-0 group flex items-center gap-2.5"
           title="Go to home"
         >
-          <div className="font-serif font-bold text-[16px] text-ink tracking-tight group-hover:text-accent transition-colors">
-            XAnge<span className="text-accent">.</span>
-          </div>
-          <div className="font-mono text-[9px] text-ink-mute uppercase tracking-[0.15em] mt-0.5">
-            Market Intelligence
+          <XangeLogo size={26} radius={6} />
+          <div>
+            <div className="font-serif font-bold text-[16px] text-ink tracking-tight group-hover:text-accent transition-colors">
+              XAnge<span className="text-accent">.</span>
+            </div>
+            <div className="font-mono text-[9px] text-ink-mute uppercase tracking-[0.15em] mt-0.5">
+              Market Intelligence
+            </div>
           </div>
         </button>
         <button
@@ -96,7 +100,7 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
           onClick={() => onSelect({ type: 'crm' })}
           className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md border-0 cursor-pointer transition-all font-sans text-[12.5px] font-medium"
           style={selected?.type === 'crm'
-            ? { background: 'rgba(0,0,0,0.09)', color: '#1a1a1a' }
+            ? { background: 'rgba(0,0,0,0.09)', color: '#15063b' }
             : { background: 'rgba(255,255,255,0.4)', color: '#4a4a4a' }}
         >
           <Database size={13} className="text-ink-mute" />
@@ -131,7 +135,7 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
               onClick={() => setMode(m)}
               className="flex-1 py-1 rounded font-sans text-[11px] font-medium transition-all cursor-pointer border capitalize"
               style={mode === m
-                ? { background: '#1a1a1a', color: '#fff', borderColor: '#1a1a1a' }
+                ? { background: '#15063b', color: '#fff', borderColor: '#15063b' }
                 : { background: 'rgba(255,255,255,0.4)', color: '#8a8580', borderColor: '#d8d2c5' }
               }
             >
@@ -162,7 +166,7 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
               className="flex items-center gap-1 px-2 py-2 rounded-md transition-all cursor-pointer group"
               style={{
                 background: selected?.id === sector.id && selected?.type === 'sector' ? bgActive : 'transparent',
-                color: selected?.id === sector.id && selected?.type === 'sector' ? '#1a1a1a' : '#4a4a4a',
+                color: selected?.id === sector.id && selected?.type === 'sector' ? '#15063b' : '#4a4a4a',
               }}
               onMouseEnter={e => { if (!(selected?.id === sector.id && selected?.type === 'sector')) e.currentTarget.style.background = bgHover }}
               onMouseLeave={e => { if (!(selected?.id === sector.id && selected?.type === 'sector')) e.currentTarget.style.background = 'transparent' }}
@@ -199,7 +203,7 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
                       className="flex items-center gap-1 px-2 py-1.5 rounded cursor-pointer transition-all"
                       style={{
                         background: selected?.id === ws.id && selected?.type === 'workspace' ? bgActive : 'transparent',
-                        color: selected?.id === ws.id && selected?.type === 'workspace' ? '#1a1a1a' : '#6a6560',
+                        color: selected?.id === ws.id && selected?.type === 'workspace' ? '#15063b' : '#6a6560',
                       }}
                       onMouseEnter={e => { if (!(selected?.id === ws.id && selected?.type === 'workspace')) e.currentTarget.style.background = bgHover }}
                       onMouseLeave={e => { if (!(selected?.id === ws.id && selected?.type === 'workspace')) e.currentTarget.style.background = 'transparent' }}
@@ -225,7 +229,7 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
                             key={co.id}
                             onClick={() => onSelect({ type: 'company', id: co.id, workspaceId: ws.id, sectorId: sector.id })}
                             className="w-full text-left flex items-center gap-1.5 px-2 py-1.5 rounded border-0 cursor-pointer transition-all font-sans text-[11.5px] bg-transparent"
-                            style={{ color: selected?.id === co.id ? '#1a1a1a' : '#8a8580' }}
+                            style={{ color: selected?.id === co.id ? '#15063b' : '#8a8580' }}
                           >
                             {co.focal && (
                               <span className="font-mono text-[8px] bg-accent-soft text-accent-deep px-1 py-0.5 rounded uppercase tracking-[0.05em] shrink-0 border border-accent-soft">

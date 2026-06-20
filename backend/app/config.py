@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     # ── Web research (M2) ──
     tavily_api_key: str = ""
 
+    # ── Open-data collection (M4) — all keyless except UK Companies House ──
+    # UK Companies House needs a free API key; the FR registry, World Bank and
+    # SEC EDGAR collectors work without any key.
+    companies_house_api_key: str = ""
+    collect_user_agent: str = "XAnge-Market-Intel/1.0 (research; contact@xange.vc)"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

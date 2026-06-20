@@ -8,7 +8,7 @@ import { synthesizeSector, askSector, patchSector, enrichSector } from '../api/c
 const SIGNAL_COLORS = {
   'Funding':    { bg: '#d4edda', text: '#2d6a3f' },
   'M&A':        { bg: '#e8e0f8', text: '#5a3d9a' },
-  'Regulatory': { bg: '#fce6dc', text: '#c04a22' },
+  'Regulatory': { bg: '#ffe5d8', text: '#c04a22' },
   'Trend':      { bg: '#e8f0fe', text: '#2a5fd4' },
   'Exit':       { bg: '#fff3cd', text: '#856404' },
 }
@@ -85,7 +85,7 @@ function InlineText({ value, onChange, multiline = false, placeholder = 'Click t
         className={`bg-white border border-rule rounded-md px-3 py-2 outline-none resize-none w-full leading-relaxed ${className}`} />
       <div className="flex gap-2">
         <button onClick={save} className="font-mono text-[9px] uppercase tracking-[0.08em] px-2.5 py-1 rounded bg-ink text-white border-0 cursor-pointer"
-          onMouseEnter={e => e.currentTarget.style.background = '#e85d3b'} onMouseLeave={e => e.currentTarget.style.background = '#1a1a1a'}>Save</button>
+          onMouseEnter={e => e.currentTarget.style.background = '#ff7a45'} onMouseLeave={e => e.currentTarget.style.background = '#15063b'}>Save</button>
         <button onClick={cancel} className="font-mono text-[9px] uppercase tracking-[0.08em] px-2.5 py-1 rounded bg-transparent border border-rule text-ink-mute cursor-pointer hover:text-ink">Cancel</button>
       </div>
     </div>
@@ -333,9 +333,9 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
             disabled={enriching}
             title="AI market research — find competitors not in our CRM (web + LLM)"
             className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.1em] px-3 py-1.5 rounded transition-all cursor-pointer disabled:opacity-50 border-0"
-            style={{ background: enriching ? '#d8d2c5' : '#1a1a1a', color: enriching ? '#8a8580' : '#fff' }}
-            onMouseEnter={e => { if (!enriching) e.currentTarget.style.background = '#e85d3b' }}
-            onMouseLeave={e => { if (!enriching) e.currentTarget.style.background = '#1a1a1a' }}
+            style={{ background: enriching ? '#d8d2c5' : '#15063b', color: enriching ? '#8a8580' : '#fff' }}
+            onMouseEnter={e => { if (!enriching) e.currentTarget.style.background = '#ff7a45' }}
+            onMouseLeave={e => { if (!enriching) e.currentTarget.style.background = '#15063b' }}
           >
             {enriching ? <><RefreshCw size={11} className="animate-spin" /> Researching…</> : <><Sparkles size={11} /> Find competitors</>}
           </button>
@@ -445,7 +445,7 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
                     {roundCounts.map(([round, count]) => (
                       <div key={round} className="flex flex-col items-center gap-1.5 flex-1">
                         <span className="font-mono text-[10px] text-ink-soft">{count}</span>
-                        <div className="w-full rounded-t" style={{ height: `${(count / maxRound) * 44 + 4}px`, background: '#e8896e' }} />
+                        <div className="w-full rounded-t" style={{ height: `${(count / maxRound) * 44 + 4}px`, background: '#ff7a45' }} />
                         <span className="font-mono text-[8px] text-ink-mute text-center leading-tight">{round}</span>
                       </div>
                     ))}
@@ -472,7 +472,7 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
               <div className="bg-white border border-rule rounded-lg overflow-hidden">
 
                 {/* Headline bet — the punchline, large serif */}
-                <div className="px-6 pt-6 pb-5 border-b border-rule" style={{ background: 'linear-gradient(180deg, #fdf6f2 0%, #ffffff 100%)' }}>
+                <div className="px-6 pt-6 pb-5 border-b border-rule" style={{ background: 'linear-gradient(180deg, #fff1ea 0%, #ffffff 100%)' }}>
                   <div className="flex items-center gap-2 mb-2.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-accent" />
                     <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-accent-deep">The bet</span>
@@ -495,10 +495,10 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
                     <span className="font-mono text-[8.5px] uppercase tracking-[0.12em] text-ink-mute">Maturity across segments</span>
                     <div className="mt-4 mb-2 relative">
                       {/* track */}
-                      <div className="relative h-1.5 rounded-full" style={{ background: 'linear-gradient(to right, #e8e0d4, #e8896e)' }}>
+                      <div className="relative h-1.5 rounded-full" style={{ background: 'linear-gradient(to right, #e8e0d4, #ff7a45)' }}>
                         {maturity.map((m) => (
                           <div key={m.id} className="absolute -translate-x-1/2" style={{ left: `${m.pos}%`, top: -3 }}>
-                            <div className="w-3 h-3 rounded-full bg-white border-2 shadow-sm" style={{ borderColor: '#1a1a1a' }} title={`${m.title} · ${m.stage}`} />
+                            <div className="w-3 h-3 rounded-full bg-white border-2 shadow-sm" style={{ borderColor: '#15063b' }} title={`${m.title} · ${m.stage}`} />
                           </div>
                         ))}
                       </div>
@@ -571,8 +571,8 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
                         <button
                           onClick={() => onSelect({ type: 'workspace', id: row.id, sectorId: sector.id })}
                           className="flex items-center gap-1.5 font-sans text-[11.5px] font-medium px-3 py-1.5 rounded-md bg-ink text-white border-0 cursor-pointer transition-all w-fit justify-self-end"
-                          onMouseEnter={e => e.currentTarget.style.background = '#e85d3b'}
-                          onMouseLeave={e => e.currentTarget.style.background = '#1a1a1a'}
+                          onMouseEnter={e => e.currentTarget.style.background = '#ff7a45'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#15063b'}
                         >
                           Enter <ArrowRight size={11} />
                         </button>
@@ -624,7 +624,7 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
                                 <td key={s.id} className="px-2 py-1.5 text-center">
                                   {m ? (
                                     <span className="inline-flex items-center justify-center w-5 h-5 rounded-full font-mono text-[9px] font-semibold"
-                                      style={{ background: m.focal ? '#fce6dc' : '#e8896e', color: m.focal ? '#b8401f' : '#fff' }}
+                                      style={{ background: m.focal ? '#ffe5d8' : '#ff7a45', color: m.focal ? '#c0420c' : '#fff' }}
                                       title={`${c.name} · ${s.title}${m.tier ? ` · tier ${m.tier}` : ''}`}>
                                       {m.focal ? '★' : (m.tier ?? '•')}
                                     </span>

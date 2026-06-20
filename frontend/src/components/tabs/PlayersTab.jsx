@@ -9,7 +9,7 @@ import { ChevronRight, ChevronDown, Sparkles } from 'lucide-react'
 // (Spec: Tab Content Refinement.pdf — Players Overview Tab)
 
 const TYPE_STYLE = {
-  direct:   { bg: '#fce6dc', text: '#b8401f', label: 'direct' },
+  direct:   { bg: '#ffe5d8', text: '#c0420c', label: 'direct' },
   indirect: { bg: '#f5edcf', text: '#8a6d1f', label: 'indirect' },
   adjacent: { bg: '#ece8e1', text: '#6a6560', label: 'adjacent' },
 }
@@ -186,7 +186,7 @@ export default function PlayersTab({ workspace }) {
                 onClick={() => setSortId(s.id)}
                 className="font-sans text-[11.5px] px-2 py-1 rounded border cursor-pointer transition-all"
                 style={sortId === s.id
-                  ? { background: '#1a1a1a', color: '#fff', borderColor: '#1a1a1a' }
+                  ? { background: '#15063b', color: '#fff', borderColor: '#15063b' }
                   : { background: '#fff', color: '#6a6560', borderColor: '#d8d2c5' }}
               >
                 {s.label}

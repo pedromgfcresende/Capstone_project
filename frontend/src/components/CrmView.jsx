@@ -75,7 +75,7 @@ export default function CrmView({ onAnalysed }) {
                 onClick={() => onFilter(() => setStatus(s))}
                 className="font-mono text-[10px] uppercase tracking-[0.06em] px-2.5 py-1 rounded border cursor-pointer transition-all"
                 style={active
-                  ? { background: '#1a1a1a', color: '#fff', borderColor: '#1a1a1a' }
+                  ? { background: '#15063b', color: '#fff', borderColor: '#15063b' }
                   : { background: '#fff', color: '#6a6560', borderColor: '#d8d2c5' }}
               >
                 {s === '' ? 'All' : c.label}{count != null && ` · ${count}`}
@@ -109,7 +109,7 @@ export default function CrmView({ onAnalysed }) {
 
       {(analysingId || analyseError) && (
         <div className="px-8 py-2 border-b border-rule bg-bg-card shrink-0 font-sans text-[12px]"
-          style={{ color: analyseError ? '#b8401f' : '#8a8580' }}>
+          style={{ color: analyseError ? '#c0420c' : '#8a8580' }}>
           {analyseError ? `Analyse failed: ${analyseError}` : 'AI market research running (suggest sector + segment, then web research)… ~1 min.'}
         </div>
       )}

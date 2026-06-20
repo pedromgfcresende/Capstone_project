@@ -82,7 +82,7 @@ export default function WorkspaceView({ workspace, sector }) {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className="relative px-3 py-3 font-sans text-[12.5px] font-medium transition-colors bg-transparent border-0 cursor-pointer whitespace-nowrap"
-            style={{ color: activeTab === tab.id ? '#1a1a1a' : '#8a8580' }}
+            style={{ color: activeTab === tab.id ? '#15063b' : '#8a8580' }}
           >
             {tab.label}
             {activeTab === tab.id && (

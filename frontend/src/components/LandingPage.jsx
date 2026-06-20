@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { ArrowRight, Upload, Search, X, Database } from 'lucide-react'
+import XangeLogo from './XangeLogo'
 
 export default function LandingPage({ sectors, onSelect, onNewSector, onOpenCrm, loadError }) {
   const [query, setQuery] = useState('')
@@ -32,10 +33,7 @@ export default function LandingPage({ sectors, onSelect, onNewSector, onOpenCrm,
 
         {/* Brand mark */}
         <div className="flex items-center gap-3 mb-8">
-          <div
-            className="w-7 h-7 rounded-md bg-accent shrink-0"
-            style={{ transform: 'rotate(-8deg)' }}
-          />
+          <XangeLogo size={34} radius={8} />
           <div>
             <div className="font-serif font-bold text-[18px] text-ink tracking-tight">
               XAnge<span className="text-accent">.</span>
@@ -109,8 +107,8 @@ export default function LandingPage({ sectors, onSelect, onNewSector, onOpenCrm,
           <button
             onClick={onNewSector}
             className="flex items-center gap-3 px-5 py-4 bg-ink text-white rounded-lg font-sans text-[13.5px] font-semibold transition-all cursor-pointer border-0 text-left group"
-            onMouseEnter={e => e.currentTarget.style.background = '#e85d3b'}
-            onMouseLeave={e => e.currentTarget.style.background = '#1a1a1a'}
+            onMouseEnter={e => e.currentTarget.style.background = '#ff7a45'}
+            onMouseLeave={e => e.currentTarget.style.background = '#15063b'}
           >
             <div className="w-7 h-7 rounded bg-white/15 flex items-center justify-center shrink-0">
               <Upload size={14} />

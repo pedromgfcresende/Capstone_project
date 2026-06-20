@@ -66,7 +66,7 @@ function SignalCard({ icon: Icon, iconColor, label, items }) {
 }
 
 const IMPACT_COLORS = {
-  High:   { bg: '#fce6dc', text: '#c04a22' },
+  High:   { bg: '#ffe5d8', text: '#c04a22' },
   Medium: { bg: '#fff3cd', text: '#856404' },
   Low:    { bg: '#f0ede8', text: '#8a8580' },
 }
@@ -98,7 +98,7 @@ export default function OverviewTab({ workspace }) {
 
         {/* AI-estimated banner */}
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-rule bg-accent-soft/40"
-          style={{ background: hasMarket ? '#fdf6f2' : '#fff' }}>
+          style={{ background: hasMarket ? '#fff1ea' : '#fff' }}>
           <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-accent-deep">
             {hasMarket ? 'AI-estimated market read — verify before use' : 'No market read yet'}
           </span>
@@ -241,14 +241,14 @@ export default function OverviewTab({ workspace }) {
             <div className="flex flex-col gap-2">
               <div className="flex justify-between font-mono text-[9px] text-ink-mute uppercase tracking-[0.08em]">
                 {['Early Adopters', 'Early Majority', 'Late Majority', 'Laggards'].map(s => (
-                  <span key={s} style={{ color: s === d.adoptionStage ? '#1a1a1a' : undefined, fontWeight: s === d.adoptionStage ? 600 : undefined }}>{s}</span>
+                  <span key={s} style={{ color: s === d.adoptionStage ? '#15063b' : undefined, fontWeight: s === d.adoptionStage ? 600 : undefined }}>{s}</span>
                 ))}
               </div>
               <div className="relative h-2 rounded-full bg-rule overflow-visible">
                 <div className="absolute inset-0 rounded-full" style={{ background: 'linear-gradient(to right, #e8e0d4, #c04a22)' }} />
                 <div
                   className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 shadow-sm"
-                  style={{ left: `calc(${pos}% - 8px)`, borderColor: '#1a1a1a' }}
+                  style={{ left: `calc(${pos}% - 8px)`, borderColor: '#15063b' }}
                 />
               </div>
             </div>

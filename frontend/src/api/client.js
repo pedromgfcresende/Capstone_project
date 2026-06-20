@@ -36,6 +36,12 @@ export const enrichSector = (id, opts = {}) => send('POST', `/sectors/${id}/enri
 export const getCrmFacets = () => get('/crm/facets')
 export const analyseCrmCompany = (id) => send('POST', `/crm/companies/${id}/analyse`)
 
+// Open-data collection (free/keyless sources from the source directory)
+export const getSources = () => get('/sources')
+export const collectRegistry = (companyId) => send('POST', `/companies/${companyId}/collect-registry`)
+export const collectMarketContext = (sectorId, country) =>
+  send('POST', `/sectors/${sectorId}/market-context`, { country })
+
 export const patchVerification = ({ entityType, entityId, claimKey, status }) =>
   send('PATCH', '/verifications', { entityType, entityId, claimKey, status })
 
