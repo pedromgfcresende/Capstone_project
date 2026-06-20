@@ -19,6 +19,21 @@ from app.db.models import (
     Segment,
     SegmentSynthesis,
 )
+from app.services.axes import (
+    EMPLOYEE_CUTOFF,
+    FUNDING_EUR_CUTOFF,
+    YEAR_FOUNDED_CUTOFF,
+    coalesce,
+    employee_range_label,
+    format_eur,
+    parse_employee_count,
+    parse_funding_to_eur,
+    parse_year,
+)
+
+# tier (competitive potential 1/2/3) -> default relation type when AI hasn't
+# inferred one yet. A heuristic the analyst confirms/edits in the Players tab.
+_TIER_TO_TYPE = {1: "direct", 2: "indirect", 3: "adjacent"}
 
 
 def _day(dt: datetime | None) -> str | None:
@@ -33,8 +48,45 @@ def _iso(d: date | None) -> str | None:
 
 
 def company_link_out(link: CompanySegment) -> dict:
-    """Per-segment view of a company (the shape the tabs consume)."""
+    """Per-segment view of a company (the shape the tabs consume).
+
+    Beyond the raw stored fields, this computes the structured values the
+    redesigned Players (Type/Category/Team/Raised) and Comparative (2x2 axes)
+    tabs need: funding parsed to EUR, founding year, employee count (ranges ->
+    midpoint), and per-axis plot eligibility against the published cutoffs.
+    """
     c = link.company
+    extra = c.extra or {}
+
+    funding_eur = parse_funding_to_eur(coalesce(c.funding_amount, extra.get("fundingEur")))
+    year_founded = parse_year(coalesce(c.founded, extra.get("yearFounded")))
+    employee_count = parse_employee_count(
+        coalesce(
+            extra.get("employeeCount"),
+            extra.get("Number of Employees"),
+            extra.get("Employees (Current)"),
+            extra.get("team"),
+            extra.get("Team"),
+        )
+    )
+
+    # Type is relative to the focal company; AI value wins, else tier heuristic.
+    relation_type = (
+        extra.get("relationType")
+        or extra.get("type")
+        or (None if link.focal else _TIER_TO_TYPE.get(link.competitive_potential))
+    )
+    # Category: what the company actually does; AI value wins, else segment title.
+    category = (
+        extra.get("category")
+        or extra.get("Category")
+        or (link.segment.title if link.segment else None)
+    )
+
+    # CRM/CSV values are trusted as-is; AI-discovered values need verification
+    # before they may plot on the Comparative matrix.
+    trusted = c.origin in ("csv", "crm")
+
     return {
         "id": str(c.id),
         "linkId": str(link.id),
@@ -42,8 +94,11 @@ def company_link_out(link: CompanySegment) -> dict:
         "focal": link.focal,
         "founded": c.founded,
         "geography": c.geography,
+        "location": c.geography,
         "fundRound": c.funding_status,
+        "round": c.funding_status,
         "fundingAmount": c.funding_amount,
+        "raised": format_eur(funding_eur) or c.funding_amount,
         "topInvestors": c.top_investors,
         "priority": link.competitive_potential,
         "description": c.description,
@@ -51,7 +106,15 @@ def company_link_out(link: CompanySegment) -> dict:
         "primaryCustomer": c.primary_customer,
         "notes": link.notes,
         "origin": c.origin,
-        "extra": c.extra or {},
+        "trusted": trusted,
+        # players + comparative structured fields
+        "relationType": relation_type,
+        "category": category,
+        "yearFounded": year_founded,
+        "fundingEur": funding_eur,
+        "employeeCount": employee_count,
+        "team": employee_range_label(employee_count),
+        "extra": extra,
     }
 
 
@@ -118,11 +181,20 @@ def segment_out(
         "sectorId": str(s.sector_id),
         "title": s.title,
         "focalCompany": s.focal_company,
+        # a segment seeded around a focal company is the "company search path"
+        # (Players shows Type, Differentiation locks the focal); otherwise it is
+        # the symmetric "sector search path".
+        "searchPath": "company" if s.focal_company else "sector",
         "updatedAt": _day(s.updated_at),
         "status": s.status,
         "summary": s.summary,
         "keyInsight": s.key_insight,
         "thesis": s.thesis,
+        "axisConfig": {
+            "fundingCutoffEur": FUNDING_EUR_CUTOFF,
+            "yearFoundedCutoff": YEAR_FOUNDED_CUTOFF,
+            "employeeCutoff": EMPLOYEE_CUTOFF,
+        },
         "priorityCompanies": [],
         "openQuestions": [],
     }

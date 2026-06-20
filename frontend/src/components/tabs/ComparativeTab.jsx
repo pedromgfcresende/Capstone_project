@@ -1,439 +1,241 @@
-import { useState, useRef, useCallback } from 'react'
-import { Pencil, ChevronDown, Sparkles } from 'lucide-react'
+import { useState, useRef, useCallback, useMemo } from 'react'
+import { ChevronDown, Hand, ShieldCheck, AlertCircle } from 'lucide-react'
 
-const COLORS = {
-  focal: { bg: '#f2a58e', border: '#e8896e', text: '#fff' },
-  default: { bg: '#1a1a1a', border: '#1a1a1a', text: '#fff' },
+// ── Structured 2x2 matrix ─────────────────────────────────────────────────────
+// All positioning comes from structured fields with transparent, published
+// cutoffs — never an LLM score. X is always Funding (EUR). Y toggles between
+// Year Founded and Employee Count. A company plots only when BOTH the chosen
+// axis values are present AND the values are trusted (CRM/CSV, or analyst-
+// verified). Anything else sits in the "Not on the matrix" tray for manual
+// placement. (Spec: Comparative Tab.pdf)
+
+const DEFAULTS = { fundingCutoffEur: 2_000_000, yearFoundedCutoff: 2023, employeeCutoff: 15 }
+
+const Y_AXES = {
+  year:      { id: 'year',      label: 'Year Founded',   field: 'yearFounded',   low: 'Established', high: 'Founded ≤2 yrs' },
+  employees: { id: 'employees', label: 'Employee Count', field: 'employeeCount', low: 'Small team',  high: 'Large team' },
 }
 
-// Deterministically spread N companies across the map on a jittered grid so
-// points never stack, whatever the company count.
-function spreadPositions(n) {
-  if (n === 0) return []
-  const margin = 12
-  const cols = Math.ceil(Math.sqrt(n))
-  const rows = Math.ceil(n / cols)
-  const cellW = (100 - 2 * margin) / cols
-  const cellH = (100 - 2 * margin) / rows
-  const rand = (seed) => { const v = Math.sin(seed * 99991) * 10000; return v - Math.floor(v) }
-  return Array.from({ length: n }, (_, i) => {
-    const col = i % cols
-    const row = Math.floor(i / cols)
-    const jx = (rand(i + 1) - 0.5) * cellW * 0.45
-    const jy = (rand(i + 137) - 0.5) * cellH * 0.45
-    return {
-      x: Math.round(margin + (col + 0.5) * cellW + jx),
-      y: Math.round(margin + (row + 0.5) * cellH + jy),
-    }
-  })
+// Quadrant captions per Y mode: [top-left, top-right, bottom-left, bottom-right]
+const QUADRANTS = {
+  year: { tl: 'Lean · young', tr: 'Well-funded · young', bl: 'Lean · established', br: 'Well-funded · established' },
+  employees: { tl: 'Bootstrapped scale', tr: 'Scaling', bl: 'Early · lean', br: 'Capital-efficient' },
 }
 
-const FUND_ROUND_SIZE = {
-  'Pre-seed': 8, 'Seed': 9, 'Series A': 11,
-  'Series B': 14, 'Series C': 17, 'Series D': 20, 'Series D+': 22,
+const COLORS = { focal: { bg: '#f2a58e', border: '#e8896e' }, default: { bg: '#1a1a1a', border: '#1a1a1a' } }
+
+// Bounded, monotonic placement centred on the cutoff (value==cutoff -> 50%).
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
+function logPos(value, cutoff, k = 0.6) {
+  if (value <= 0) return 8
+  return 50 + 40 * Math.tanh(k * (Math.log(value) - Math.log(cutoff)))
+}
+function linPos(value, cutoff, spread = 3) {
+  return 50 + 40 * Math.tanh((value - cutoff) / spread)
 }
 
-const AXIS_PRESETS = [
-  { x: { low: 'Niche', high: 'Broad' },          y: { low: 'Early', high: 'Mature' } },
-  { x: { low: 'Product-led', high: 'Sales-led' }, y: { low: 'SMB', high: 'Enterprise' } },
-  { x: { low: 'Local', high: 'Global' },          y: { low: 'Thin', high: 'Deep tech' } },
-  { x: { low: 'Low price', high: 'Premium' },     y: { low: 'Early adopter', high: 'Mass market' } },
-]
-
-const SIZE_METRICS = [
-  { id: 'none',      label: 'Equal size' },
-  { id: 'priority',  label: 'Priority score' },
-  { id: 'fundRound', label: 'Funding round' },
-  { id: 'founded',   label: 'Company age' },
-]
-
-const CLUSTER_STROKE = 'rgba(150,140,128,0.3)'
-const CLUSTER_FILL = 'rgba(150,140,128,0.05)'
-
-function cross(O, A, B) {
-  return (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x)
+function fmtFunding(eur) {
+  if (eur == null) return '—'
+  if (eur >= 1e9) return `€${(eur / 1e9).toFixed(1).replace(/\.0$/, '')}B`
+  if (eur >= 1e6) return `€${(eur / 1e6).toFixed(1).replace(/\.0$/, '')}M`
+  if (eur >= 1e3) return `€${Math.round(eur / 1e3)}K`
+  return `€${Math.round(eur)}`
 }
 
-function convexHull(pts) {
-  if (pts.length < 2) return pts
-  const sorted = [...pts].sort((a, b) => a.x - b.x || a.y - b.y)
-  const lower = [], upper = []
-  for (const p of sorted) {
-    while (lower.length >= 2 && cross(lower[lower.length-2], lower[lower.length-1], p) <= 0) lower.pop()
-    lower.push(p)
-  }
-  for (let i = sorted.length - 1; i >= 0; i--) {
-    const p = sorted[i]
-    while (upper.length >= 2 && cross(upper[upper.length-2], upper[upper.length-1], p) <= 0) upper.pop()
-    upper.push(p)
-  }
-  upper.pop(); lower.pop()
-  return [...lower, ...upper]
-}
-
-function expandHull(hull, pad) {
-  const cx = hull.reduce((s, p) => s + p.x, 0) / hull.length
-  const cy = hull.reduce((s, p) => s + p.y, 0) / hull.length
-  return hull.map(p => {
-    const dx = p.x - cx, dy = p.y - cy
-    const d = Math.hypot(dx, dy) || 1
-    return { x: p.x + (dx / d) * pad, y: p.y + (dy / d) * pad }
-  })
-}
-
-function smoothClosedPath(pts) {
-  const n = pts.length
-  if (n < 2) return ''
-  let d = `M ${pts[0].x} ${pts[0].y}`
-  for (let i = 0; i < n; i++) {
-    const p1 = pts[i], p2 = pts[(i + 1) % n]
-    const p0 = pts[(i - 1 + n) % n], p3 = pts[(i + 2) % n]
-    const cp1x = p1.x + (p2.x - p0.x) / 6
-    const cp1y = p1.y + (p2.y - p0.y) / 6
-    const cp2x = p2.x - (p3.x - p1.x) / 6
-    const cp2y = p2.y - (p3.y - p1.y) / 6
-    d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`
-  }
-  return d + ' Z'
-}
-
-// DBSCAN: returns array of groups (arrays of points); unclustered points are omitted
-function dbscan(points, eps = 13, minPts = 2) {
-  const visited = new Set()
-  const clusters = []
-
-  const neighbors = (p) => points.filter(q => Math.hypot(p.x - q.x, p.y - q.y) <= eps)
-
-  for (const point of points) {
-    if (visited.has(point)) continue
-    visited.add(point)
-    const nb = neighbors(point)
-    if (nb.length < minPts) continue
-    const cluster = new Set(nb)
-    cluster.add(point)
-    const queue = [...nb]
-    while (queue.length) {
-      const q = queue.shift()
-      if (!visited.has(q)) {
-        visited.add(q)
-        const qn = neighbors(q)
-        if (qn.length >= minPts) qn.forEach(n => { if (!cluster.has(n)) { cluster.add(n); queue.push(n) } })
-      }
-    }
-    clusters.push([...cluster])
-  }
-  return clusters
-}
-
-function getBubbleSize(metric, player) {
-  const base = 10
-  switch (metric) {
-    case 'priority':
-      return player.priority ? 6 + player.priority * 3 : base
-    case 'fundRound': {
-      const size = FUND_ROUND_SIZE[player.fundRound]
-      return size || base
-    }
-    case 'founded': {
-      if (!player.founded) return base
-      const age = new Date().getFullYear() - parseInt(player.founded)
-      return Math.min(22, Math.max(7, 5 + age * 1.5))
-    }
-    default:
-      return base
-  }
-}
-
-function EditableLabel({ value, onChange, className, style }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value)
-
-  const save = () => { onChange(draft); setEditing(false) }
-
-  if (editing) return (
-    <div style={style}>
-      <input
-        autoFocus
-        value={draft}
-        onChange={e => setDraft(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
-        onBlur={save}
-        className="bg-white border border-ink-mute rounded px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink outline-none w-32"
-      />
-    </div>
-  )
-
-  return (
-    <div
-      className={`group flex items-center gap-1 cursor-pointer ${className}`}
-      style={style}
-      onClick={() => { setEditing(true); setDraft(value) }}
-    >
-      <span>{value}</span>
-      <Pencil size={9} className="opacity-0 group-hover:opacity-50 transition-opacity" />
-    </div>
-  )
+function yValueLabel(co, yAxis) {
+  if (yAxis.id === 'year') return co.yearFounded ?? '—'
+  return co.team || co.employeeCount || '—'
 }
 
 export default function ComparativeTab({ workspace }) {
+  const cfg = useMemo(() => ({ ...DEFAULTS, ...(workspace.axisConfig || {}) }), [workspace.axisConfig])
+  const companies = useMemo(() => workspace.companies || [], [workspace.companies])
+
+  const [yMode, setYMode] = useState('year')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [showNames, setShowNames] = useState(true)
+  // local trust overrides (analyst verifies an AI value so it may plot)
+  const [verified, setVerified] = useState({})
+  // manual placements: id -> {x,y}
+  const [manual, setManual] = useState({})
+
+  const yAxis = Y_AXES[yMode]
+  const quad = QUADRANTS[yMode]
+
   const canvasRef = useRef(null)
   const draggingRef = useRef(null)
 
-  const [xAxis, setXAxis] = useState({ low: 'Niche', high: 'Broad' })
-  const [yAxis, setYAxis] = useState({ low: 'Early', high: 'Mature' })
-  const [quadrants, setQuadrants] = useState({
-    tl: 'Mature Niche', tr: 'Mature Broad',
-    bl: 'Early Niche',  br: 'Early Broad',
-  })
-  const [sizeMetric, setSizeMetric] = useState('none')
-  const [sizeScale, setSizeScale] = useState(1)
-  const [showNames, setShowNames] = useState(true)
-  const [metricOpen, setMetricOpen] = useState(false)
-  const [axisOpen, setAxisOpen] = useState(false)
-  const [suggesting, setSuggesting] = useState(false)
-  const [clustersOn, setClustersOn] = useState(false)
+  // Classify every company: plotted, needs-verification, or missing-data.
+  const classified = useMemo(() => {
+    return companies.map(co => {
+      const fund = co.fundingEur
+      const yVal = co[yAxis.field]
+      const hasBoth = fund != null && yVal != null
+      const isTrusted = co.trusted || verified[co.id]
+      const manualPos = manual[co.id]
+      let state
+      if (manualPos) state = 'manual'
+      else if (!hasBoth) state = 'missing'
+      else if (!isTrusted) state = 'unverified'
+      else state = 'plotted'
 
-  const suggestAxes = () => {
-    setSuggesting(true)
-    setTimeout(() => { setSuggesting(false); setAxisOpen(true) }, 800)
-  }
+      const x = manualPos ? manualPos.x : (fund != null ? clamp(logPos(fund, cfg.fundingCutoffEur), 5, 95) : null)
+      const cutoffY = yAxis.id === 'year' ? cfg.yearFoundedCutoff : cfg.employeeCutoff
+      const yRaw = yAxis.id === 'year'
+        ? (yVal != null ? linPos(yVal, cutoffY) : null)
+        : (yVal != null ? logPos(yVal, cutoffY, 0.8) : null)
+      // screen y: high value = top (small %)
+      const y = manualPos ? manualPos.y : (yRaw != null ? clamp(100 - yRaw, 5, 95) : null)
+      return { ...co, state, x, y, fund, yVal }
+    })
+  }, [companies, yAxis, verified, manual, cfg])
 
-  const [positions, setPositions] = useState(() => {
-    const cos = workspace.companies || []
-    const spread = spreadPositions(cos.length)
-    return cos.map((co, i) => ({
-      id: co.id, name: co.name, focal: co.focal || false,
-      priority: co.priority || null, fundRound: co.fundRound || '',
-      founded: co.founded || '',
-      x: spread[i].x,
-      y: spread[i].y,
-    }))
-  })
+  const plotted = classified.filter(c => c.state === 'plotted' || c.state === 'manual')
+  const offMatrix = classified.filter(c => c.state === 'missing' || c.state === 'unverified')
 
-  const [tooltip, setTooltip] = useState(null)
-
-  const getCanvasCoords = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect()
+  const getCoords = (e) => {
+    const r = canvasRef.current.getBoundingClientRect()
     return {
-      x: Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100)),
-      y: Math.min(100, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100)),
+      x: clamp(((e.clientX - r.left) / r.width) * 100, 0, 100),
+      y: clamp(((e.clientY - r.top) / r.height) * 100, 0, 100),
     }
   }
-
-  const onMouseDown = (e, id) => { e.preventDefault(); draggingRef.current = id }
-
   const onMouseMove = useCallback((e) => {
     if (!draggingRef.current) return
-    const { x, y } = getCanvasCoords(e)
-    setPositions(p => p.map(co => co.id === draggingRef.current ? { ...co, x, y } : co))
+    const { x, y } = getCoords(e)
+    setManual(m => ({ ...m, [draggingRef.current]: { x, y } }))
   }, [])
-
   const onMouseUp = useCallback(() => { draggingRef.current = null }, [])
 
-  const selectedMetricLabel = SIZE_METRICS.find(m => m.id === sizeMetric)?.label
+  const placeManually = (id) => setManual(m => ({ ...m, [id]: { x: 50, y: 50 } }))
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 px-8 py-4 overflow-hidden">
-      <div className="flex-1 flex flex-col min-h-0 max-w-[780px] mx-auto w-full gap-3">
+    <div className="flex-1 flex flex-col min-h-0 px-8 py-4 overflow-y-auto">
+      <div className="max-w-[860px] mx-auto w-full flex flex-col gap-3">
 
-        {/* Controls row */}
-        <div className="flex items-center justify-between">
-          <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-ink-mute">Positioning map · drag to reposition</span>
+        {/* Controls */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-ink-mute">
+              Positioning matrix · structured fields only
+            </span>
+            <div className="font-sans text-[11px] text-ink-mute mt-0.5">
+              X: Funding · cutoff <span className="text-ink-soft font-medium">{fmtFunding(cfg.fundingCutoffEur)}</span>
+              {'   ·   '}
+              Y: {yAxis.label} · cutoff <span className="text-ink-soft font-medium">{yMode === 'year' ? cfg.yearFoundedCutoff : cfg.employeeCutoff}</span>
+            </div>
+          </div>
 
           <div className="flex items-center gap-2">
-
-            {/* Suggest axes */}
+            {/* Y axis toggle */}
             <div className="relative">
               <button
-                onClick={suggestAxes}
-                disabled={suggesting}
-                className="flex items-center gap-1.5 font-sans text-[12px] font-medium px-3 py-1.5 rounded-md border border-rule bg-white text-ink-soft hover:text-ink hover:border-ink-mute transition-all cursor-pointer disabled:opacity-50"
-              >
-                <Sparkles size={11} className="text-accent" />
-                {suggesting ? 'Thinking…' : 'Suggest axes'}
-              </button>
-
-              {axisOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-rule rounded-lg shadow-lg overflow-hidden z-20 w-64">
-                  <div className="px-4 py-2 border-b border-rule">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">AI axis suggestions</span>
-                  </div>
-                  {AXIS_PRESETS.map((preset, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { setXAxis(preset.x); setYAxis(preset.y); setAxisOpen(false) }}
-                      className="w-full text-left px-4 py-3 font-sans text-[12px] hover:bg-bg transition-colors border-0 bg-transparent cursor-pointer border-b border-rule last:border-b-0"
-                    >
-                      <span className="font-medium text-ink">{preset.x.low} → {preset.x.high}</span>
-                      <span className="text-ink-mute mx-1.5">×</span>
-                      <span className="font-medium text-ink">{preset.y.low} → {preset.y.high}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Size metric dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setMetricOpen(p => !p)}
+                onClick={() => setMenuOpen(o => !o)}
                 className="flex items-center gap-2 font-sans text-[12px] text-ink-soft hover:text-ink border border-rule bg-white rounded-md px-3 py-1.5 cursor-pointer transition-colors"
               >
-                <span>Size by: <span className="font-medium text-ink">{selectedMetricLabel}</span></span>
-                <ChevronDown size={12} className="text-ink-mute" style={{ transform: metricOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                <span>Y axis: <span className="font-medium text-ink">{yAxis.label}</span></span>
+                <ChevronDown size={12} className="text-ink-mute" style={{ transform: menuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               </button>
-              {metricOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-rule rounded-lg shadow-lg overflow-hidden z-20 w-44">
-                  {SIZE_METRICS.map(m => (
+              {menuOpen && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-rule rounded-lg shadow-lg overflow-hidden z-30 w-48">
+                  {Object.values(Y_AXES).map(a => (
                     <button
-                      key={m.id}
-                      onClick={() => { setSizeMetric(m.id); setMetricOpen(false) }}
+                      key={a.id}
+                      onClick={() => { setYMode(a.id); setMenuOpen(false) }}
                       className="w-full text-left px-4 py-2.5 font-sans text-[12.5px] hover:bg-bg transition-colors border-0 bg-transparent cursor-pointer"
-                      style={{ color: sizeMetric === m.id ? '#1a1a1a' : '#6a6560', fontWeight: sizeMetric === m.id ? 600 : 400 }}
+                      style={{ color: yMode === a.id ? '#1a1a1a' : '#6a6560', fontWeight: yMode === a.id ? 600 : 400 }}
                     >
-                      {m.label}
+                      Funding × {a.label}
                     </button>
                   ))}
                 </div>
               )}
             </div>
-
+            <button
+              onClick={() => setShowNames(p => !p)}
+              className="font-sans text-[12px] text-ink-soft hover:text-ink border border-rule bg-white rounded-md px-3 py-1.5 cursor-pointer transition-colors"
+            >
+              {showNames ? 'Hide names' : 'Show names'}
+            </button>
           </div>
         </div>
 
-        {/* X axis top labels */}
-        <div className="flex items-center justify-between px-10">
-          <EditableLabel value={xAxis.low} onChange={v => setXAxis(p => ({ ...p, low: v }))}
-            className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-mute" />
-          <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-ink-mute opacity-40">← x axis →</span>
-          <EditableLabel value={xAxis.high} onChange={v => setXAxis(p => ({ ...p, high: v }))}
-            className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-mute" />
+        {/* X top labels */}
+        <div className="flex items-center justify-between px-12">
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-mute">Lean</span>
+          <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-ink-mute opacity-40">← funding →</span>
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-mute">Well-funded</span>
         </div>
 
-        <div className="flex items-stretch gap-3 flex-1 min-h-0">
-
-          {/* Y axis label */}
+        <div className="flex items-stretch gap-3" style={{ height: 440 }}>
+          {/* Y label */}
           <div className="flex flex-col items-center justify-between shrink-0 py-2">
-            <EditableLabel value={yAxis.high} onChange={v => setYAxis(p => ({ ...p, high: v }))}
-              className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-mute"
-              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }} />
-            <span className="font-mono text-[9px] text-ink-mute opacity-40" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>↕</span>
-            <EditableLabel value={yAxis.low} onChange={v => setYAxis(p => ({ ...p, low: v }))}
-              className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-mute"
-              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }} />
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-mute" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>{yAxis.high}</span>
+            <span className="font-mono text-[9px] text-ink-mute opacity-40" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>{yAxis.label}</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-mute" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>{yAxis.low}</span>
           </div>
-
 
           {/* Canvas */}
           <div
             ref={canvasRef}
-            className="relative flex-1 min-h-0 rounded-lg border border-rule select-none overflow-hidden"
-            style={{ background: '#ffffff', cursor: draggingRef.current ? 'grabbing' : 'default' }}
+            className="relative flex-1 rounded-lg border border-rule select-none overflow-hidden"
+            style={{ background: '#fff' }}
             onMouseMove={onMouseMove}
             onMouseUp={onMouseUp}
             onMouseLeave={onMouseUp}
           >
-            {/* Cluster regions — SVG overlay */}
-            {clustersOn && (() => {
-              const groups = dbscan(positions)
-              return (
-                <svg
-                  className="absolute inset-0 w-full h-full pointer-events-none"
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
-                  style={{ zIndex: 5 }}
-                >
-                  {groups.map((group, i) => {
-                    if (group.length === 1) {
-                      return (
-                        <circle key={i}
-                          cx={group[0].x} cy={group[0].y} r={6}
-                          fill={CLUSTER_FILL} stroke={CLUSTER_STROKE}
-                          strokeWidth="0.3" strokeDasharray="1.5,1.2"
-                        />
-                      )
-                    }
-                    const hull = convexHull(group)
-                    const expanded = expandHull(hull, 5)
-                    const d = smoothClosedPath(expanded)
-                    return (
-                      <path key={i} d={d}
-                        fill={CLUSTER_FILL} stroke={CLUSTER_STROKE}
-                        strokeWidth="0.3" strokeDasharray="1.5,1.2"
-                      />
-                    )
-                  })}
-                </svg>
-              )
-            })()}
-
-            {/* Grid lines */}
+            {/* cutoff lines */}
             <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute top-1/2 left-0 right-0 border-t border-rule" />
-              <div className="absolute left-1/2 top-0 bottom-0 border-l border-rule" />
+              <div className="absolute top-1/2 left-0 right-0 border-t border-dashed" style={{ borderColor: '#e8896e' }} />
+              <div className="absolute left-1/2 top-0 bottom-0 border-l border-dashed" style={{ borderColor: '#e8896e' }} />
+              <span className="absolute left-1/2 bottom-1 -translate-x-1/2 font-mono text-[8px] text-accent-deep bg-white/80 px-1 rounded">{fmtFunding(cfg.fundingCutoffEur)}</span>
+              <span className="absolute top-1/2 left-1 -translate-y-1/2 font-mono text-[8px] text-accent-deep bg-white/80 px-1 rounded">{yMode === 'year' ? cfg.yearFoundedCutoff : cfg.employeeCutoff}</span>
             </div>
 
-            {/* Quadrant labels */}
+            {/* quadrant labels */}
             {[
-              { key: 'tl', style: { top: '4%', left: '3%' } },
-              { key: 'tr', style: { top: '4%', right: '3%' } },
-              { key: 'bl', style: { bottom: '4%', left: '3%' } },
-              { key: 'br', style: { bottom: '4%', right: '3%' } },
+              { key: 'tl', style: { top: '5%', left: '3%' } },
+              { key: 'tr', style: { top: '5%', right: '3%' } },
+              { key: 'bl', style: { bottom: '5%', left: '3%' } },
+              { key: 'br', style: { bottom: '5%', right: '3%' } },
             ].map(({ key, style }) => (
-              <div key={key} className="absolute pointer-events-auto" style={style}>
-                <EditableLabel
-                  value={quadrants[key]}
-                  onChange={v => setQuadrants(p => ({ ...p, [key]: v }))}
-                  className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-mute opacity-40 hover:opacity-70 transition-opacity"
-                />
-              </div>
+              <span key={key} className="absolute font-mono text-[9px] uppercase tracking-[0.1em] text-ink-mute opacity-50" style={style}>
+                {quad[key]}
+              </span>
             ))}
 
-            {/* Company bubbles */}
-            {positions.map(co => {
+            {plotted.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center font-sans text-[12.5px] text-ink-mute italic px-8 text-center">
+                No companies have both a funding and {yAxis.label.toLowerCase()} value yet.<br />Place them manually from the tray below, or verify AI values.
+              </div>
+            )}
+
+            {/* bubbles */}
+            {plotted.map(co => {
               const colors = co.focal ? COLORS.focal : COLORS.default
-              const size = getBubbleSize(sizeMetric, co) * sizeScale
+              const size = co.focal ? 16 : 13
               const half = size / 2
-              // Place label away from chart center to reduce collisions
               const labelRight = co.x > 50
               const labelBelow = co.y < 50
-
               return (
                 <div
                   key={co.id}
-                  onMouseDown={e => onMouseDown(e, co.id)}
+                  onMouseDown={(e) => { e.preventDefault(); draggingRef.current = co.id }}
                   className="absolute cursor-grab active:cursor-grabbing"
-                  style={{
-                    left: `calc(${co.x}% - ${half}px)`,
-                    top: `calc(${co.y}% - ${half}px)`,
-                    zIndex: tooltip === co.id ? 20 : 10,
-                  }}
+                  style={{ left: `calc(${co.x}% - ${half}px)`, top: `calc(${co.y}% - ${half}px)`, zIndex: 10 }}
+                  title={`${co.name} · ${fmtFunding(co.fund)} · ${yValueLabel(co, yAxis)}`}
                 >
-                  <div
-                    className="rounded-full"
-                    style={{
-                      width: size,
-                      height: size,
-                      background: colors.bg,
-                      border: `2px solid ${colors.border}`,
-                      boxShadow: tooltip === co.id ? '0 4px 14px rgba(0,0,0,0.18)' : '0 1px 4px rgba(0,0,0,0.08)',
-                      transition: 'width 0.2s ease, height 0.2s ease, box-shadow 0.15s ease',
-                    }}
-                    onMouseEnter={() => setTooltip(co.id)}
-                    onMouseLeave={() => setTooltip(null)}
-                  />
-
+                  <div className="rounded-full" style={{ width: size, height: size, background: colors.bg, border: `2px solid ${colors.border}`, boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }} />
+                  {co.state === 'manual' && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full" style={{ background: '#c08a3a' }} title="Manually placed" />
+                  )}
                   {showNames && (
                     <div
                       className="absolute font-sans text-[10px] font-medium whitespace-nowrap pointer-events-none"
                       style={{
-                        color: co.focal ? '#f2a58e' : '#3a3a3a',
-                        ...(labelBelow
-                          ? { top: size + 2 }
-                          : { bottom: size + 2 }),
-                        ...(labelRight
-                          ? { right: 0 }
-                          : { left: 0 }),
+                        color: co.focal ? '#d0492b' : '#3a3a3a',
+                        ...(labelBelow ? { top: size + 2 } : { bottom: size + 2 }),
+                        ...(labelRight ? { right: 0 } : { left: 0 }),
                       }}
                     >
                       {co.name}
@@ -443,114 +245,90 @@ export default function ComparativeTab({ workspace }) {
               )
             })}
           </div>
-
-          {/* Axis side panel */}
-          <div className="w-44 shrink-0 flex flex-col gap-4 overflow-y-auto py-1">
-
-            <div>
-              <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute mb-2">X axis</div>
-              <div className="flex flex-col gap-1">
-                {AXIS_PRESETS.map((preset, i) => {
-                  const active = xAxis.low === preset.x.low && xAxis.high === preset.x.high
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => setXAxis(preset.x)}
-                      className="text-left px-3 py-2 rounded-md font-sans text-[11.5px] border cursor-pointer transition-all"
-                      style={active
-                        ? { background: '#1a1a1a', color: '#fff', borderColor: '#1a1a1a' }
-                        : { background: '#fff', color: '#6a6560', borderColor: '#d8d2c5' }
-                      }
-                    >
-                      {preset.x.low} → {preset.x.high}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div>
-              <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute mb-2">Y axis</div>
-              <div className="flex flex-col gap-1">
-                {AXIS_PRESETS.map((preset, i) => {
-                  const active = yAxis.low === preset.y.low && yAxis.high === preset.y.high
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => setYAxis(preset.y)}
-                      className="text-left px-3 py-2 rounded-md font-sans text-[11.5px] border cursor-pointer transition-all"
-                      style={active
-                        ? { background: '#1a1a1a', color: '#fff', borderColor: '#1a1a1a' }
-                        : { background: '#fff', color: '#6a6560', borderColor: '#d8d2c5' }
-                      }
-                    >
-                      {preset.y.low} → {preset.y.high}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Display controls */}
-            <div className="pt-3 border-t border-rule flex flex-col gap-3">
-              <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">Display</div>
-
-              <div className="flex items-center justify-between">
-                <span className="font-sans text-[11.5px] text-ink-soft">Names</span>
-                <button
-                  onClick={() => setShowNames(p => !p)}
-                  className="relative rounded-full border-0 cursor-pointer transition-colors shrink-0"
-                  style={{ background: showNames ? '#1a1a1a' : '#d8d2c5', width: 32, height: 18 }}
-                >
-                  <span className="absolute top-0.5 rounded-full bg-white"
-                    style={{ width: 14, height: 14, left: showNames ? 16 : 2, transition: 'left 0.2s ease' }} />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="font-sans text-[11.5px] text-ink-soft">Clusters</span>
-                <button
-                  onClick={() => setClustersOn(p => !p)}
-                  className="relative rounded-full border-0 cursor-pointer transition-colors shrink-0"
-                  style={{ background: clustersOn ? '#1a1a1a' : '#d8d2c5', width: 32, height: 18 }}
-                >
-                  <span className="absolute top-0.5 rounded-full bg-white"
-                    style={{ width: 14, height: 14, left: clustersOn ? 16 : 2, transition: 'left 0.2s ease' }} />
-                </button>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-sans text-[11.5px] text-ink-soft">Scale</span>
-                  <span className="font-mono text-[9px] text-ink-mute">{sizeScale.toFixed(1)}×</span>
-                </div>
-                <input
-                  type="range" min="0.4" max="2.2" step="0.05"
-                  value={sizeScale}
-                  onChange={e => setSizeScale(parseFloat(e.target.value))}
-                  className="w-full cursor-pointer"
-                />
-              </div>
-            </div>
-
-          </div>
-
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-5 px-10">
+        <div className="flex items-center gap-5 px-12 flex-wrap">
           <div className="flex items-center gap-2">
-            <div className="w-3.5 h-3.5 rounded-full bg-ink shrink-0" />
+            <div className="w-3 h-3 rounded-full bg-ink" />
             <span className="font-sans text-[11.5px] text-ink-soft">Competitor</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: '#f2a58e' }} />
+            <div className="w-3 h-3 rounded-full" style={{ background: '#f2a58e' }} />
             <span className="font-sans text-[11.5px] text-ink-soft">Focal company</span>
           </div>
-          {sizeMetric !== 'none' && (
-            <span className="font-sans text-[11px] text-ink-mute italic ml-auto">
-              Bubble size = {selectedMetricLabel?.toLowerCase()}
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ background: '#c08a3a' }} />
+            <span className="font-sans text-[11.5px] text-ink-soft">Manually placed</span>
+          </div>
+          <span className="font-sans text-[11px] text-ink-mute italic ml-auto">Drag any point to reposition</span>
+        </div>
+
+        {/* Off-matrix tray */}
+        <div className="mt-2 border-t border-rule pt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Hand size={13} className="text-ink-mute" />
+            <span className="font-mono text-[9px] uppercase tracking-[0.13em] text-ink-mute">
+              Not on the matrix · {offMatrix.length}
             </span>
+          </div>
+          {offMatrix.length === 0 ? (
+            <p className="font-sans text-[12px] text-ink-mute italic">Every company is positioned.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {offMatrix.map(co => {
+                const missingFund = co.fund == null
+                const missingY = co.yVal == null
+                const unverified = co.state === 'unverified'
+                return (
+                  <div key={co.id} className="flex items-center justify-between gap-3 bg-white border border-rule rounded-md px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-sans text-[12.5px] font-medium text-ink truncate">{co.name}</span>
+                        {co.focal && <span className="font-mono text-[7px] uppercase tracking-[0.05em] text-accent-deep bg-accent-soft px-1 py-0.5 rounded border border-accent-soft shrink-0">focal</span>}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {unverified ? (
+                          <span className="flex items-center gap-1 font-sans text-[10.5px] text-accent-deep">
+                            <AlertCircle size={10} /> AI values — verify to plot
+                          </span>
+                        ) : (
+                          <span className="font-sans text-[10.5px] text-ink-mute">
+                            Missing {[missingFund && 'funding', missingY && yAxis.label.toLowerCase()].filter(Boolean).join(' & ')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {unverified && (
+                        <button
+                          onClick={() => setVerified(v => ({ ...v, [co.id]: true }))}
+                          className="flex items-center gap-1 font-sans text-[11px] font-medium px-2 py-1 rounded border border-rule bg-white text-ink-soft hover:text-ink hover:border-ink-mute transition-all cursor-pointer"
+                          title="Confirm AI-extracted values"
+                        >
+                          <ShieldCheck size={11} className="text-good" /> Verify
+                        </button>
+                      )}
+                      <button
+                        onClick={() => placeManually(co.id)}
+                        className="font-sans text-[11px] font-medium px-2 py-1 rounded border border-rule bg-white text-ink-soft hover:text-ink hover:border-ink-mute transition-all cursor-pointer"
+                      >
+                        Place manually
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {Object.keys(manual).length > 0 && (
+            <button
+              onClick={() => setManual({})}
+              className="mt-3 font-mono text-[9px] uppercase tracking-[0.1em] text-ink-mute hover:text-ink bg-transparent border-0 cursor-pointer"
+            >
+              Reset manual placements
+            </button>
           )}
         </div>
 

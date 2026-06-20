@@ -1,140 +1,90 @@
-import { useState, useRef } from 'react'
-import { ChevronRight, ChevronDown, Plus, Sparkles, X, Trash2, NotebookPen } from 'lucide-react'
-import CompanyProfile from '../CompanyProfile'
+import { useState, useMemo } from 'react'
+import { ChevronRight, ChevronDown, Sparkles } from 'lucide-react'
 
-const BUBBLE_COLORS = {
-  1: { active: '#e8a09a', inactive: '#f5e0de' },
-  2: { active: '#e8c97a', inactive: '#f5edcf' },
-  3: { active: '#e8c97a', inactive: '#f5edcf' },
-  4: { active: '#8ec9a0', inactive: '#d4edda' },
-  5: { active: '#8ec9a0', inactive: '#d4edda' },
+// ── Players Overview ──────────────────────────────────────────────────────────
+// A clean, signal-first table. No black-box priority score (removed by design —
+// it anchors judgment before the analyst reads the data). Two paths:
+//   • company search → Type (direct/indirect/adjacent, relative to the focal)
+//   • sector search  → no Type column; Category carries the weight.
+// (Spec: Tab Content Refinement.pdf — Players Overview Tab)
+
+const TYPE_STYLE = {
+  direct:   { bg: '#fce6dc', text: '#b8401f', label: 'direct' },
+  indirect: { bg: '#f5edcf', text: '#8a6d1f', label: 'indirect' },
+  adjacent: { bg: '#ece8e1', text: '#6a6560', label: 'adjacent' },
+}
+const TYPE_CYCLE = ['direct', 'indirect', 'adjacent']
+
+const ROUND_ORDER = ['Pre-Seed', 'Pre-seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Series D', 'Series D+', 'Series E']
+const roundRank = (r) => {
+  if (!r) return -1
+  const i = ROUND_ORDER.findIndex(o => o.toLowerCase() === String(r).toLowerCase())
+  return i === -1 ? ROUND_ORDER.length : i
 }
 
-const FIXED_COLS = [
-  { key: 'founded',   label: 'Founded',    width: '80px'  },
-  { key: 'geography', label: 'Geography',  width: '110px' },
-  { key: 'fundRound', label: 'Fund Round', width: '120px' },
+const SORTS = [
+  { id: 'round',   label: 'Round',   get: c => roundRank(c.round) },
+  { id: 'raised',  label: 'Raised',  get: c => c.raisedEur ?? -1 },
+  { id: 'founded', label: 'Founded', get: c => c.yearFounded ?? -1 },
+  { id: 'team',    label: 'Team',    get: c => c.employeeCount ?? -1 },
+  { id: 'name',    label: 'Name',    get: c => c.name?.toLowerCase() },
 ]
 
-function PriorityPicker({ value, onChange }) {
-  const colors = value ? BUBBLE_COLORS[value] : { active: '#d8d2c5', inactive: '#ece8e1' }
+function TypePill({ value, onCycle }) {
+  if (!value) return (
+    <button onClick={onCycle} className="font-mono text-[9px] text-ink-mute hover:text-ink bg-transparent border border-dashed border-rule rounded px-1.5 py-0.5 cursor-pointer">set</button>
+  )
+  const s = TYPE_STYLE[value] || TYPE_STYLE.adjacent
   return (
-    <div className="flex items-center gap-1">
-      {[1, 2, 3, 4, 5].map(n => (
-        <button
-          key={n}
-          onClick={() => onChange(value === n ? null : n)}
-          className="w-2.5 h-2.5 rounded-full border-0 cursor-pointer"
-          style={{
-            background: value >= n ? colors.active : colors.inactive,
-            transition: 'background 0.25s ease, transform 0.15s ease',
-            transform: value >= n ? 'scale(1.15)' : 'scale(1)',
-          }}
-        />
-      ))}
-    </div>
+    <button
+      onClick={onCycle}
+      title="Click to change · AI-inferred, verify"
+      className="font-mono text-[9.5px] px-1.5 py-0.5 rounded cursor-pointer border-0"
+      style={{ background: s.bg, color: s.text }}
+    >
+      {s.label}
+    </button>
   )
 }
 
-function EditableField({ label, value, onChange, rows = 1 }) {
-  const [editing, setEditing] = useState(false)
-  const ref = useRef(null)
-  const activate = () => { setEditing(true); setTimeout(() => ref.current?.focus(), 0) }
-
+function CategoryPill({ value }) {
+  if (!value) return <span className="text-ink-mute">—</span>
   return (
-    <div className="flex items-start gap-4 py-2.5 border-b border-rule last:border-b-0">
-      <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute w-28 shrink-0 pt-0.5">{label}</span>
-      {editing ? (
-        <textarea
-          ref={ref}
-          value={value || ''}
-          onChange={e => onChange(e.target.value)}
-          onBlur={() => setEditing(false)}
-          rows={rows}
-          className="flex-1 bg-transparent border-0 border-b-2 border-accent outline-none font-sans text-[13px] text-ink resize-none leading-relaxed"
-        />
-      ) : (
-        <div onClick={activate} className="flex-1 font-sans text-[13px] leading-relaxed cursor-text" style={{ color: value ? '#1a1a1a' : '#b0a89e' }}>
-          {value || `Add ${label.toLowerCase()}…`}
-        </div>
-      )}
-    </div>
+    <span className="inline-block font-sans text-[11px] text-ink-soft bg-bg border border-rule rounded-full px-2 py-0.5 truncate max-w-full">
+      {value}
+    </span>
   )
 }
 
-function InlineCell({ value, onChange }) {
-  const [editing, setEditing] = useState(false)
-  const ref = useRef(null)
-  const activate = (e) => { e.stopPropagation(); setEditing(true); setTimeout(() => ref.current?.focus(), 0) }
-
-  if (editing) return (
-    <input
-      ref={ref}
-      value={value || ''}
-      onChange={e => onChange(e.target.value)}
-      onBlur={() => setEditing(false)}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setEditing(false) }}
-      onClick={e => e.stopPropagation()}
-      className="w-full bg-white border border-ink-mute rounded px-2 py-0.5 font-sans text-[12.5px] text-ink outline-none"
-    />
-  )
-
+function RoundBadge({ value }) {
+  if (!value) return <span className="text-ink-mute font-mono text-[11px]">—</span>
   return (
-    <div onClick={activate} className="font-sans text-[12.5px] cursor-text truncate" style={{ color: value ? '#4a4a4a' : '#c0b9b0' }}>
-      {value || '—'}
-    </div>
+    <span className="font-mono text-[10px] text-ink-soft border border-rule rounded px-1.5 py-0.5 whitespace-nowrap">
+      {value}
+    </span>
   )
 }
 
-function PlayerRow({ player, customColumns, onUpdate, onRemove, onOpenProfile }) {
+function PlayerRow({ player, showType, colTemplate, onCycleType, onDescribe }) {
   const [expanded, setExpanded] = useState(false)
-  const [enhancing, setEnhancing] = useState(false)
-  const [extraFields, setExtraFields] = useState(player.extraFields || [])
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [busy, setBusy] = useState(false)
 
-  const colTemplate = `28px 1fr ${FIXED_COLS.map(c => c.width).join(' ')}${customColumns.map(() => ' 120px').join('')} 36px 130px 28px`
-
-  const handleEnhance = () => {
-    setEnhancing(true)
-    setTimeout(() => {
-      onUpdate({
-        description: player.description || `${player.name} is a notable player in this space with a differentiated approach to the market.`,
-        segment: player.segment || 'B2B SaaS',
-        primaryCustomer: player.primaryCustomer || 'Mid-market companies',
-      })
-      setEnhancing(false)
-    }, 1200)
+  const expand = () => {
+    setExpanded(e => !e)
+    if (!expanded && !player.description && onDescribe) {
+      setBusy(true)
+      Promise.resolve(onDescribe(player.id)).finally(() => setBusy(false))
+    }
   }
 
   return (
-    <div className={`border-b border-rule last:border-b-0 ${player.focal ? 'bg-accent-soft/30' : ''}`}>
-      {confirmDelete ? (
-        <div className="flex items-center gap-3 px-4 py-3 bg-red-50/60 border-b border-red-100">
-          <span className="font-sans text-[12.5px] text-ink flex-1">
-            Remove <span className="font-medium">{player.name}</span>? This can't be undone.
-          </span>
-          <button
-            onClick={() => setConfirmDelete(false)}
-            className="font-sans text-[12px] px-3 py-1.5 rounded-md border border-rule bg-white text-ink-soft hover:text-ink cursor-pointer transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onRemove}
-            className="font-sans text-[12px] px-3 py-1.5 rounded-md border border-red-300 bg-red-500 text-white hover:bg-red-600 cursor-pointer transition-colors"
-          >
-            Remove
-          </button>
-        </div>
-      ) : (
+    <div className={`border-b border-rule last:border-b-0 ${player.focal ? 'bg-accent-soft/25' : ''}`}>
       <div
-        className="group grid items-center px-4 py-3 cursor-pointer hover:bg-bg transition-colors"
+        className="grid items-center px-4 py-2.5 cursor-pointer hover:bg-bg transition-colors"
         style={{ gridTemplateColumns: colTemplate }}
-        onClick={() => setExpanded(p => !p)}
+        onClick={expand}
       >
-        <span className="text-ink-mute">
-          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-        </span>
+        <span className="text-ink-mute">{expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}</span>
 
         <div className="flex items-center gap-2 min-w-0">
           <span className="font-sans text-[13px] font-medium text-ink truncate">{player.name}</span>
@@ -143,233 +93,152 @@ function PlayerRow({ player, customColumns, onUpdate, onRemove, onOpenProfile })
           )}
         </div>
 
-        {FIXED_COLS.map(col => (
-          <InlineCell key={col.key} value={player[col.key]} onChange={v => onUpdate({ [col.key]: v })} />
-        ))}
+        {showType && (
+          <div onClick={e => e.stopPropagation()}>
+            {player.focal ? <span className="text-ink-mute font-mono text-[11px]">—</span> : <TypePill value={player.relationType} onCycle={() => onCycleType(player.id)} />}
+          </div>
+        )}
 
-        {customColumns.map(col => (
-          <InlineCell
-            key={col.id}
-            value={player.customFields?.[col.id] || ''}
-            onChange={v => onUpdate({ customFields: { ...player.customFields, [col.id]: v } })}
-          />
-        ))}
-
-        <span />
-
-        <div onClick={e => e.stopPropagation()}>
-          <PriorityPicker value={player.priority} onChange={v => onUpdate({ priority: v })} />
-        </div>
-
-        <button
-          onClick={e => { e.stopPropagation(); setConfirmDelete(true) }}
-          className="opacity-0 group-hover:opacity-100 flex items-center justify-center bg-transparent border-0 cursor-pointer text-ink-mute hover:text-red-400 transition-all p-0"
-        >
-          <Trash2 size={12} />
-        </button>
+        <div className="min-w-0"><CategoryPill value={player.category} /></div>
+        <span className="font-mono text-[11.5px] text-ink-soft">{player.yearFounded || player.founded || '—'}</span>
+        <span className="font-sans text-[12px] text-ink-soft truncate">{player.location || '—'}</span>
+        <RoundBadge value={player.round} />
+        <span className="font-mono text-[11.5px] text-ink-soft">{player.raised || '—'}</span>
+        <span className="font-mono text-[11px] text-ink-mute whitespace-nowrap">{player.team || '—'}</span>
       </div>
-      )}
 
       {expanded && (
-        <div className="px-4 py-3 bg-bg border-t border-rule flex gap-4 items-start">
-          <div className="flex-1 bg-white border border-rule rounded-lg px-5 py-1">
-            {[
-              { key: 'description',    label: 'Description',      rows: 2 },
-              { key: 'segment',        label: 'Segment',           rows: 1 },
-              { key: 'primaryCustomer',label: 'Primary customer',  rows: 1 },
-              { key: 'notes',          label: 'Notes',             rows: 2 },
-            ].map(({ key, label, rows }) => (
-              <EditableField key={key} label={label} value={player[key]} onChange={v => onUpdate({ [key]: v })} rows={rows} />
-            ))}
-            {extraFields.map((field, i) => (
-              <EditableField
-                key={field.id}
-                label={field.label}
-                value={field.value}
-                onChange={v => {
-                  const updated = extraFields.map((f, j) => j === i ? { ...f, value: v } : f)
-                  setExtraFields(updated)
-                  onUpdate({ extraFields: updated })
-                }}
-                rows={1}
-              />
-            ))}
-            <button
-              onClick={() => {
-                const updated = [...extraFields, { id: `ef-${Date.now()}`, label: 'New field', value: '' }]
-                setExtraFields(updated)
-                onUpdate({ extraFields: updated })
-              }}
-              className="flex items-center gap-1.5 w-full py-2.5 font-sans text-[11.5px] text-ink-mute hover:text-ink bg-transparent border-0 cursor-pointer transition-colors border-t border-rule"
-            >
-              <Plus size={11} />
-              Add field
-            </button>
-          </div>
-          <div className="shrink-0 flex flex-col gap-2 mt-1">
-            <button
-              onClick={onOpenProfile}
-              className="flex items-center gap-1.5 font-sans text-[11.5px] font-medium px-3 py-2 rounded-md border border-rule bg-white text-ink-soft hover:text-ink hover:border-ink-mute transition-all cursor-pointer whitespace-nowrap"
-            >
-              <NotebookPen size={11} className="text-accent" />
-              Notes &amp; contacts
-            </button>
-            <button
-              onClick={handleEnhance}
-              disabled={enhancing}
-              className="flex items-center gap-1.5 font-sans text-[11.5px] font-medium px-3 py-2 rounded-md border border-rule bg-white text-ink-soft hover:text-ink hover:border-ink-mute transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap"
-            >
-              <Sparkles size={11} className="text-accent" />
-              {enhancing ? 'Enhancing…' : 'AI enhance'}
-            </button>
-          </div>
+        <div className="px-4 py-3 bg-bg border-t border-rule" style={{ paddingLeft: 44 }}>
+          {busy ? (
+            <div className="flex items-center gap-2 font-sans text-[12px] text-ink-mute italic">
+              <Sparkles size={12} className="text-accent animate-pulse" /> Generating description…
+            </div>
+          ) : (
+            <p className="font-sans text-[12.5px] text-ink-soft leading-relaxed max-w-[680px]">
+              {player.description || 'No description yet — expand triggers a one-time AI summary from the homepage + Crunchbase, then caches it.'}
+            </p>
+          )}
+          {player.notes && (
+            <p className="mt-2 font-sans text-[11.5px] text-ink-mute italic leading-relaxed max-w-[680px]">
+              <span className="font-mono text-[8px] uppercase tracking-[0.08em] not-italic mr-1.5">Note</span>{player.notes}
+            </p>
+          )}
         </div>
-      )}
-    </div>
-  )
-}
-
-function EditableColHeader({ label, onChange, onRemove }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(label)
-  const ref = useRef(null)
-
-  const save = () => { onChange(draft); setEditing(false) }
-
-  return (
-    <div className="group flex items-center gap-1 min-w-0">
-      {editing ? (
-        <input
-          ref={ref}
-          autoFocus
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onBlur={save}
-          onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
-          className="w-full bg-transparent border-0 border-b border-ink-mute outline-none font-mono text-[9px] uppercase tracking-[0.12em] text-ink"
-        />
-      ) : (
-        <>
-          <span
-            className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute cursor-pointer hover:text-ink truncate"
-            onClick={() => { setEditing(true); setDraft(label) }}
-          >
-            {label}
-          </span>
-          <button
-            onClick={onRemove}
-            className="opacity-0 group-hover:opacity-100 shrink-0 bg-transparent border-0 cursor-pointer p-0 text-ink-mute hover:text-red-400 transition-all"
-          >
-            <X size={9} />
-          </button>
-        </>
       )}
     </div>
   )
 }
 
 export default function PlayersTab({ workspace }) {
-  const [players, setPlayers] = useState(() =>
-    (workspace.companies || []).map(co => ({
-      founded: '', geography: '', fundRound: '', priority: null,
-      description: '', segment: '', primaryCustomer: '', notes: '',
-      customFields: {}, ...co,
-    }))
-  )
-  const [customColumns, setCustomColumns] = useState([])
-  const [profileCompany, setProfileCompany] = useState(null)
+  const searchPath = workspace.searchPath || (workspace.focalCompany ? 'company' : 'sector')
+  const showType = searchPath === 'company'
 
-  const sorted = [...players].sort((a, b) => {
-    if (!a.priority && !b.priority) return 0
-    if (!a.priority) return 1
-    if (!b.priority) return -1
-    return b.priority - a.priority
+  const [overrides, setOverrides] = useState({})  // id -> { relationType?, description? }
+  const [sortId, setSortId] = useState('round')
+
+  const merged = useMemo(
+    () => (workspace.companies || []).map(c => ({ ...c, ...overrides[c.id] })),
+    [workspace.companies, overrides]
+  )
+
+  const sorted = useMemo(() => {
+    const sort = SORTS.find(s => s.id === sortId) || SORTS[0]
+    const arr = [...merged]
+    arr.sort((a, b) => {
+      // focal pinned to top
+      if (a.focal && !b.focal) return -1
+      if (b.focal && !a.focal) return 1
+      const va = sort.get(a), vb = sort.get(b)
+      if (typeof va === 'string') return va.localeCompare(vb)
+      return vb - va  // numeric: descending (most-funded / latest / largest first)
+    })
+    return arr
+  }, [merged, sortId])
+
+  const cycleType = (id) => setOverrides(o => {
+    const cur = (o[id]?.relationType) ?? merged.find(c => c.id === id)?.relationType
+    const idx = TYPE_CYCLE.indexOf(cur)
+    const nextType = TYPE_CYCLE[(idx + 1) % TYPE_CYCLE.length]
+    return { ...o, [id]: { ...o[id], relationType: nextType } }
   })
 
-  const update = (id, changes) => setPlayers(p => p.map(co => co.id === id ? { ...co, ...changes } : co))
+  // Stand-in for the "generate on first expand, then cache" description flow.
+  const describe = (id) => setOverrides(o => ({
+    ...o,
+    [id]: { ...o[id], description: o[id]?.description || _stubDescription(merged.find(c => c.id === id)) },
+  }))
 
-  const addPlayer = () => {
-    const id = `co-${Date.now()}`
-    setPlayers(p => [...p, {
-      id, name: 'New company', focal: false, founded: '', geography: '',
-      fundRound: '', priority: null, description: '', segment: '',
-      primaryCustomer: '', notes: '', customFields: {},
-    }])
-  }
-
-  const addColumn = () => {
-    const id = `col-${Date.now()}`
-    setCustomColumns(p => [...p, { id, label: 'New column' }])
-  }
-
-  const remove = (id) => setPlayers(p => p.filter(co => co.id !== id))
-
-  const colTemplate = `28px 1fr ${FIXED_COLS.map(c => c.width).join(' ')}${customColumns.map(() => ' 120px').join('')} 36px 130px 28px`
+  // grid: chevron | name | [type] | category | founded | location | round | raised | team
+  const colTemplate = showType
+    ? '28px minmax(150px,1.5fr) 84px minmax(110px,1fr) 74px 110px 96px 84px 96px'
+    : '28px minmax(150px,1.5fr) minmax(130px,1.2fr) 74px 110px 96px 84px 96px'
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-rule bg-bg-card shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">Sort by</span>
+          <div className="flex items-center gap-1">
+            {SORTS.map(s => (
+              <button
+                key={s.id}
+                onClick={() => setSortId(s.id)}
+                className="font-sans text-[11.5px] px-2 py-1 rounded border cursor-pointer transition-all"
+                style={sortId === s.id
+                  ? { background: '#1a1a1a', color: '#fff', borderColor: '#1a1a1a' }
+                  : { background: '#fff', color: '#6a6560', borderColor: '#d8d2c5' }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">
+          {sorted.length} companies · {searchPath} search
+        </span>
+      </div>
 
-      {/* Table header */}
-      <div
-        className="grid items-center px-4 py-2 border-b border-rule bg-bg-card shrink-0"
-        style={{ gridTemplateColumns: colTemplate }}
-      >
+      {/* Header */}
+      <div className="grid items-center px-4 py-2 border-b border-rule bg-bg-card shrink-0" style={{ gridTemplateColumns: colTemplate }}>
         <span />
         <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">Name</span>
-        {FIXED_COLS.map(col => (
-          <span key={col.key} className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">{col.label}</span>
-        ))}
-        {customColumns.map(col => (
-          <EditableColHeader
-            key={col.id}
-            label={col.label}
-            onChange={label => setCustomColumns(p => p.map(c => c.id === col.id ? { ...c, label } : c))}
-            onRemove={() => setCustomColumns(p => p.filter(c => c.id !== col.id))}
-          />
-        ))}
-        <button
-          onClick={addColumn}
-          className="flex items-center justify-center text-ink-mute hover:text-ink bg-transparent border-0 cursor-pointer transition-colors p-0"
-          title="Add column"
-        >
-          <Plus size={13} />
-        </button>
-        <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">Priority /5</span>
-        <span />
+        {showType && <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">Type</span>}
+        <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">Category</span>
+        <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">Founded</span>
+        <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">Location</span>
+        <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">Round</span>
+        <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">Raised</span>
+        <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">Team</span>
       </div>
 
       {/* Rows */}
       <div className="flex-1 overflow-y-auto">
         {sorted.length === 0 ? (
           <div className="flex items-center justify-center py-16 text-ink-mute font-sans text-[13px] italic">
-            No companies yet — add one below
+            No companies in this segment yet.
           </div>
         ) : (
           sorted.map(player => (
-            <div key={player.id} style={{ transition: 'all 0.3s ease' }}>
-              <PlayerRow
-                player={player}
-                customColumns={customColumns}
-                onUpdate={changes => update(player.id, changes)}
-                onRemove={() => remove(player.id)}
-                onOpenProfile={() => setProfileCompany(player)}
-              />
-            </div>
+            <PlayerRow
+              key={player.id}
+              player={player}
+              showType={showType}
+              colTemplate={colTemplate}
+              onCycleType={cycleType}
+              onDescribe={describe}
+            />
           ))
         )}
-
-        <button
-          onClick={addPlayer}
-          className="flex items-center gap-2 w-full px-5 py-3 text-left font-sans text-[12.5px] text-ink-mute hover:text-ink hover:bg-bg border-0 bg-transparent cursor-pointer transition-colors border-t border-rule"
-        >
-          <Plus size={13} />
-          Add company
-        </button>
       </div>
-
-      {profileCompany && (
-        <CompanyProfile company={profileCompany} onClose={() => setProfileCompany(null)} />
-      )}
     </div>
   )
+}
+
+function _stubDescription(co) {
+  if (!co) return ''
+  const bits = [co.category, co.location, co.round].filter(Boolean).join(', ')
+  return `${co.name} operates in ${co.category || 'this segment'}${bits ? ` (${bits})` : ''}. ` +
+    `${co.raised && co.raised !== '—' ? `It has raised ${co.raised}. ` : ''}` +
+    `Expand-time summaries are generated once from public sources and cached.`
 }

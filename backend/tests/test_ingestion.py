@@ -6,7 +6,10 @@ import pandas as pd
 
 from app.services.ingestion.common import build_extra, to_date, to_float, to_int
 from app.services.ingestion.competitor_csv import _norm, _note_in_row, _segments_in_row
-from app.services.ingestion.crm_csv import _row_to_company as crm_row
+from app.services.ingestion.crm_csv import (
+    _row_to_company as crm_row,
+    coalesce_duplicate_columns,
+)
 
 
 def test_scalar_coercion():
@@ -71,3 +74,39 @@ def test_crm_core_mapping():
     assert c.year_founded == 2021
     assert c.lead_status == "hot"
     assert c.extra == {"Random Enrichment": "x"}
+
+
+def test_crm_coalesces_duplicate_columns():
+    # Affinity/Dealroom duplicate headers: pandas suffixes the 2nd with ".1".
+    # The numeric "Number of Employees" is blank; the range duplicate fills it.
+    raw = pd.DataFrame(
+        [["Acme", None, "11-50", None, "2020"]],
+        columns=[
+            "Name",
+            "Number of Employees",
+            "Number of Employees.1",
+            "Year Founded",
+            "Year Founded.1",
+        ],
+    )
+    merged = coalesce_duplicate_columns(raw)
+    assert "Number of Employees.1" not in merged.columns
+    assert "Year Founded.1" not in merged.columns
+    assert merged.loc[0, "Number of Employees"] == "11-50"
+    assert merged.loc[0, "Year Founded"] == "2020"
+
+
+def test_crm_employee_range_parsed_to_midpoint():
+    row = {"Name": "Acme", "Number of Employees": "51-200"}
+    c = crm_row(row)
+    assert c.employees_current == 126  # (51+200)/2 = 125.5 -> 126 (round-half-even)
+
+
+def test_crm_prefers_numeric_employee_over_range():
+    # "Employees (Current)" numeric is the fallback when Number of Employees blank
+    row = {"Name": "Acme", "Number of Employees": None, "Employees (Current)": "52.0"}
+    c = crm_row(row)
+    assert c.employees_current == 52
+    # the structured employee columns must not leak into extra
+    assert "Number of Employees" not in c.extra
+    assert "Employees (Current)" not in c.extra
