@@ -54,42 +54,62 @@ def _profile_links(name: str, domain: str | None) -> list[dict]:
     return out
 
 
-def collect_company_sources(
-    name: str, *, domain: str | None = None, description: str | None = None, max_links: int = 6
-) -> list[dict]:
-    """Return up to `max_links` direct, company-specific source links.
-
-    Each link is {url, name, field}. Web-research hits (deduped to one per host)
-    come first; deterministic profile links fill any remaining slots.
-    """
-    found: list[dict] = []
-    seen_hosts: set[str] = set()
-
-    queries = [
-        f"{name} official website",
-        f"{name} startup crunchbase OR dealroom",
-        f"{name} funding round raise",
+# Per-company research queries, grounded in the source directory (Excel):
+# homepage/product, Crunchbase/Dealroom (funding, founded, employees), pricing
+# (distribution model), customers/ICP, and recent funding news.
+def _queries(name: str) -> list[str]:
+    return [
+        f'"{name}" official website product',
+        f'"{name}" funding round raised investors crunchbase OR dealroom',
+        f'"{name}" pricing plans',
+        f'"{name}" customers OR "case study" target market',
+        f'"{name}" news 2024 OR 2025 funding OR launch',
     ]
-    for q in queries:
+
+
+def deep_research_company(
+    name: str, *, domain: str | None = None, description: str | None = None,
+    max_links: int = 6, max_digest: int = 2200,
+) -> dict:
+    """Deep web research for one company.
+
+    Returns {sources, digest}: `sources` are up to `max_links` direct, company-
+    specific links (deduped by host, deterministic profiles fill the rest);
+    `digest` is the concatenated text of the best hits, used to ground the LLM
+    synthesis in real, fetched content.
+    """
+    sources: list[dict] = []
+    seen_hosts: set[str] = set()
+    digest_parts: list[str] = []
+
+    for q in _queries(name):
         for r in web_search(q, max_results=4):
             url = (r.get("url") or "").strip()
             host = _host(url)
-            if not url or not host or host in _JUNK_HOSTS or host in seen_hosts:
+            if not url or not host or host in _JUNK_HOSTS:
                 continue
-            seen_hosts.add(host)
-            found.append({"url": url, "name": (r.get("title") or host)[:90], "field": None})
-            if len(found) >= max_links:
-                break
-        if len(found) >= max_links:
-            break
+            content = (r.get("content") or "").strip()
+            if content:
+                digest_parts.append(f"[{(r.get('title') or host)[:80]}] {content[:320]}")
+            if host not in seen_hosts and len(sources) < max_links:
+                seen_hosts.add(host)
+                sources.append({"url": url, "name": (r.get("title") or host)[:90], "field": None})
 
-    # supplement with deterministic profiles (skipping hosts we already have)
     for link in _profile_links(name, domain):
-        if len(found) >= max_links:
+        if len(sources) >= max_links:
             break
         if _host(link["url"]) in seen_hosts:
             continue
         seen_hosts.add(_host(link["url"]))
-        found.append(link)
+        sources.append(link)
 
-    return found[:max_links]
+    return {"sources": sources[:max_links], "digest": "\n".join(digest_parts)[:max_digest]}
+
+
+def collect_company_sources(
+    name: str, *, domain: str | None = None, description: str | None = None, max_links: int = 6
+) -> list[dict]:
+    """Just the direct source links for a company (see `deep_research_company`)."""
+    return deep_research_company(
+        name, domain=domain, description=description, max_links=max_links
+    )["sources"]

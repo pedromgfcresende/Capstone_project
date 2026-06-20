@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 import app.services.research.sources as srcmod
-from app.services.research.sources import _host, _slug, collect_company_sources
+from app.services.research.sources import (
+    _host,
+    _slug,
+    collect_company_sources,
+    deep_research_company,
+)
 
 
 def test_slug_and_host():
@@ -50,3 +55,14 @@ def test_collect_caps_results(monkeypatch):
     monkeypatch.setattr(srcmod, "web_search", lambda q, max_results=4: many)
     out = collect_company_sources("BigCo", max_links=6)
     assert len(out) == 6
+
+
+def test_deep_research_builds_digest_from_content(monkeypatch):
+    monkeypatch.setattr(srcmod, "web_search", lambda q, max_results=4: [
+        {"url": "https://qonto.com", "title": "Qonto", "content": "Qonto is a business banking platform for SMEs."},
+        {"url": "https://sifted.eu/x", "title": "Qonto raises", "content": "Qonto raised €486M Series D."},
+    ])
+    res = deep_research_company("Qonto")
+    assert res["sources"]                       # direct links collected
+    assert "business banking" in res["digest"]  # real content grounds the synthesis
+    assert "Series D" in res["digest"]

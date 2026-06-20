@@ -1,9 +1,4 @@
-import { useState } from 'react'
-import { Sparkles, ShieldCheck } from 'lucide-react'
-import { VerifyDot, VerifyLegend, VERIFY_ORDER } from './VerifyDot'
-import { patchVerification } from '../api/client'
-
-const next = (s) => VERIFY_ORDER[(VERIFY_ORDER.indexOf(s) + 1) % VERIFY_ORDER.length]
+import { Sparkles } from 'lucide-react'
 
 function Section({ label, children }) {
   if (!children) return null
@@ -15,37 +10,17 @@ function Section({ label, children }) {
   )
 }
 
-export default function SynthesisPanel({ workspaceId, synthesis, keyInsight }) {
-  const initial = synthesis?.verifications || {}
-  const [verifs, setVerifs] = useState(initial)
-
+export default function SynthesisPanel({ synthesis, keyInsight }) {
   if (!synthesis) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
         <Sparkles size={20} className="text-ink-mute" />
         <div className="font-sans text-[13px] text-ink-mute">No AI analysis yet.</div>
         <div className="font-sans text-[12px] text-ink-mute">
-          Click <span className="font-semibold text-ink">Synthesise</span> in the header to generate one.
+          Click <span className="font-semibold text-ink">Synthesise</span> in the header to run deep research and generate one.
         </div>
       </div>
     )
-  }
-
-  const claims = synthesis.sources?.claims || []
-
-  const cycle = async (key) => {
-    const newStatus = next(verifs[key] || 'ai')
-    setVerifs((p) => ({ ...p, [key]: newStatus }))  // optimistic
-    try {
-      await patchVerification({
-        entityType: 'workspace_synthesis',
-        entityId: workspaceId,
-        claimKey: key,
-        status: newStatus,
-      })
-    } catch {
-      setVerifs((p) => ({ ...p, [key]: verifs[key] || 'ai' }))  // revert on failure
-    }
   }
 
   const txt = (s) => s?.text || null
@@ -55,9 +30,10 @@ export default function SynthesisPanel({ workspaceId, synthesis, keyInsight }) {
 
       <div className="flex items-center gap-2 font-mono text-[10px] text-ink-mute">
         <Sparkles size={12} className="text-accent" />
-        <span>AI synthesis</span>
+        <span>AI synthesis · deep research</span>
         {synthesis.model && <span>· {synthesis.model}</span>}
         {synthesis.generatedAt && <span>· {synthesis.generatedAt.slice(0, 10)}</span>}
+        <span className="ml-auto font-sans normal-case text-ink-mute">Direct sources in the Sources tab →</span>
       </div>
 
       {/* Executive summary + key insight */}
@@ -84,30 +60,6 @@ export default function SynthesisPanel({ workspaceId, synthesis, keyInsight }) {
         <Section label="Commentary · investment angle">{txt(synthesis.commentary)}</Section>
       </div>
 
-      {/* Verifiable claims */}
-      {claims.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <ShieldCheck size={11} className="text-ink-mute" />
-              <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-ink-mute">
-                Verifiable claims · {claims.length}
-              </span>
-            </div>
-            <VerifyLegend />
-          </div>
-          <div className="bg-white border border-rule rounded-lg overflow-hidden divide-y divide-rule">
-            {claims.map((c) => (
-              <div key={c.key} className="flex items-start gap-3 px-4 py-3 hover:bg-bg transition-colors">
-                <div className="mt-[3px]">
-                  <VerifyDot status={verifs[c.key] || 'ai'} onClick={() => cycle(c.key)} />
-                </div>
-                <p className="font-sans text-[12.5px] text-ink-soft leading-relaxed flex-1">{c.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

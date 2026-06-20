@@ -74,17 +74,33 @@ def _model(temperature: float = 0.3):
     )
 
 
+def _research_text(research: list[dict] | None) -> str:
+    """Render per-company web-research digests for the prompt."""
+    if not research:
+        return "(no web research available)"
+    blocks = []
+    for r in research:
+        digest = (r.get("digest") or "").strip()
+        if not digest:
+            continue
+        blocks.append(f"### {r.get('name', '?')}\n{digest}")
+    return "\n\n".join(blocks) or "(no web research available)"
+
+
 def synthesize_segment(
-    *, title: str, focal: str | None, thesis: str | None, companies: list[dict]
+    *, title: str, focal: str | None, thesis: str | None, companies: list[dict],
+    research: list[dict] | None = None,
 ) -> WorkspaceSynthesisResult:
     """companies: list of dicts (name, focal, tier, founded, geography, funding_status,
-    funding_amount, top_investors, segment, primary_customer, description, notes)."""
+    funding_amount, top_investors, segment, primary_customer, description, notes).
+    research: optional list of {name, digest} web-research digests per company."""
     structured = _model().with_structured_output(WorkspaceSynthesisResult)
     human = HUMAN_TEMPLATE.format(
         title=title,
         focal=focal or "(none specified)",
         thesis=thesis or "(none provided)",
         companies_json=json.dumps(companies, ensure_ascii=False, indent=2),
+        research_text=_research_text(research),
     )
     return structured.invoke(
         [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=human)]

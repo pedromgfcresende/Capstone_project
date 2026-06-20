@@ -277,6 +277,6 @@ def crm_company_out(c: CrmCompany) -> dict:
         "lastMeeting": _iso(c.last_meeting),
         "nextMeeting": _iso(c.next_meeting),
         "employeesCurrent": c.employees_current,
-        # pipeline membership is a manual flag (default in-pipeline for CRM rows)
-        "inPipeline": (c.extra or {}).get("inPipeline", True),
+        # row provenance: CSV-imported vs added by the AI competitor analysis
+        "source": (c.extra or {}).get("source", "csv"),
     }

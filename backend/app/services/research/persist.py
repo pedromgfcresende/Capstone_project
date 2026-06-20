@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.db.models import Company, CompanySegment, CrmCompany, Sector, Segment
@@ -12,6 +12,30 @@ from app.db.models import Company, CompanySegment, CrmCompany, Sector, Segment
 
 def norm(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "").strip()).lower()
+
+
+def _ensure_ai_pipeline_row(db: Session, comp: dict) -> None:
+    """Add an 'AI added' row to the Deal Pipeline for a net-new competitor (one the
+    CSV import never contained), tagged extra.source='ai'. Idempotent by name."""
+    name = comp.get("name", "")
+    if not name:
+        return
+    exists = (
+        db.query(CrmCompany)
+        .filter(func.lower(CrmCompany.name) == name.lower())
+        .filter(CrmCompany.extra["source"].astext == "ai")
+        .first()
+    )
+    if exists:
+        return
+    db.add(CrmCompany(
+        name=name,
+        website=comp.get("website"),
+        country=comp.get("geography") or comp.get("hq"),
+        investment_stage=comp.get("funding"),
+        lead_status="unknown",
+        extra={"source": "ai"},
+    ))
 
 
 def persist_competitors(
@@ -27,7 +51,18 @@ def persist_competitors(
         if not nkey or nkey in existing:
             continue
         existing.add(nkey)
-        crm = db.query(CrmCompany).filter(func.lower(CrmCompany.name) == comp["name"].lower()).first()
+        # match only against original CSV-imported pipeline rows (not AI-added ones)
+        crm = (
+            db.query(CrmCompany)
+            .filter(func.lower(CrmCompany.name) == comp["name"].lower())
+            .filter(or_(
+                CrmCompany.extra["source"].astext.is_(None),
+                CrmCompany.extra["source"].astext != "ai",
+            ))
+            .first()
+        )
+        if crm is None:
+            _ensure_ai_pipeline_row(db, comp)  # net-new -> surface in the pipeline as "AI added"
         company = Company(
             sector_id=sector.id, name=comp["name"], founded=comp.get("founded"),
             funding_status=comp.get("funding"), description=comp.get("description"),

@@ -3,10 +3,8 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from pydantic import BaseModel
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
-from sqlalchemy.orm.attributes import flag_modified
 
 from app.api.serializers import crm_company_out, sector_out
 from app.config import settings
@@ -102,27 +100,6 @@ def get_crm_company(company_id: uuid.UUID, db: Session = Depends(get_db)) -> dic
     out = crm_company_out(c)
     out["extra"] = c.extra or {}
     return out
-
-
-class CrmCompanyPatch(BaseModel):
-    inPipeline: bool
-
-
-@router.patch("/companies/{company_id}")
-def patch_crm_company(
-    company_id: uuid.UUID, payload: CrmCompanyPatch, db: Session = Depends(get_db)
-) -> dict:
-    """Toggle a company's pipeline membership (In Pipeline / Not in Pipeline)."""
-    c = db.get(CrmCompany, company_id)
-    if c is None:
-        raise HTTPException(status_code=404, detail="CRM company not found")
-    extra = dict(c.extra or {})
-    extra["inPipeline"] = payload.inPipeline
-    c.extra = extra
-    flag_modified(c, "extra")
-    db.commit()
-    db.refresh(c)
-    return crm_company_out(c)
 
 
 @router.post("/companies/{company_id}/analyse")

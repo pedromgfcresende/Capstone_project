@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { Sparkles, RefreshCw } from 'lucide-react'
 import OverviewTab from './tabs/OverviewTab'
 import PlayersTab from './tabs/PlayersTab'
-import ComparativeTab from './tabs/ComparativeTab'
 import DifferentiationTab from './tabs/DifferentiationTab'
 import SourcesTab from './tabs/SourcesTab'
 import SynthesisPanel from './SynthesisPanel'
@@ -12,7 +11,6 @@ const TABS = [
   { id: 'summary', label: 'AI Analysis' },
   { id: 'overview', label: 'Market Overview' },
   { id: 'players', label: 'Players' },
-  { id: 'comparative', label: 'Comparative' },
   { id: 'differentiation', label: 'Differentiation' },
   { id: 'sources', label: 'Sources' },
 ]
@@ -105,7 +103,6 @@ export default function WorkspaceView({ workspace, sector, onSectorsChanged }) {
             )}
             {activeTab === 'overview' && <OverviewTab workspace={ws} sector={sector} />}
             {activeTab === 'players' && <PlayersTab workspace={ws} sector={sector} onMoved={() => { load(); onSectorsChanged?.() }} />}
-            {activeTab === 'comparative' && <ComparativeTab workspace={ws} sector={sector} />}
             {activeTab === 'differentiation' && <DifferentiationTab workspace={ws} sector={sector} />}
             {activeTab === 'sources' && <SourcesTab workspace={ws} sector={sector} onReload={load} />}
           </>

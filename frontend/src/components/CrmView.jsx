@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Search, X, ExternalLink, ChevronLeft, ChevronRight, Sparkles, RefreshCw, Upload, Check } from 'lucide-react'
-import { getCrmCompanies, getCrmFacets, analyseCrmCompany, uploadCrmReconcile, setCompanyPipeline } from '../api/client'
+import { getCrmCompanies, getCrmFacets, analyseCrmCompany, uploadCrmReconcile } from '../api/client'
 
 const PAGE = 25
 const fmtEur = (n) => (n == null ? '—' : n >= 1e6 ? `€${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `€${Math.round(n / 1e3)}k` : `€${n}`)
@@ -44,13 +44,6 @@ export default function CrmView({ onAnalysed }) {
   useEffect(() => { fetchPage() }, [fetchPage])
 
   const onFilter = (fn) => { setOffset(0); fn() }
-
-  const togglePipeline = async (id, current) => {
-    try {
-      const updated = await setCompanyPipeline(id, !current)
-      setData(d => ({ ...d, items: d.items.map(x => x.id === id ? { ...x, inPipeline: updated.inPipeline } : x) }))
-    } catch { /* ignore */ }
-  }
 
   const onUpload = async (e) => {
     const file = e.target.files?.[0]
@@ -159,7 +152,7 @@ export default function CrmView({ onAnalysed }) {
         <table className="w-full border-collapse">
           <thead className="sticky top-0 bg-bg z-10">
             <tr className="border-b border-rule">
-              {['Company', 'Country', 'Stage', 'Funding', 'Pipeline', ''].map((h, i) => (
+              {['Company', 'Country', 'Stage', 'Funding', 'Source', ''].map((h, i) => (
                 <th key={i} className="text-left font-mono text-[8.5px] uppercase tracking-[0.1em] text-ink-mute px-4 py-2.5 font-medium">{h}</th>
               ))}
             </tr>
@@ -183,16 +176,15 @@ export default function CrmView({ onAnalysed }) {
                 <td className="px-4 py-2.5 font-sans text-[12px] text-ink-soft">{c.investmentStage || '—'}</td>
                 <td className="px-4 py-2.5 font-mono text-[11.5px] text-ink-soft">{fmtEur(c.totalFundingEur)}</td>
                 <td className="px-4 py-2.5">
-                  <button
-                    onClick={() => togglePipeline(c.id, c.inPipeline !== false)}
-                    title="Toggle pipeline membership"
-                    className="font-mono text-[8.5px] uppercase tracking-[0.05em] px-2 py-0.5 rounded cursor-pointer border transition-all"
-                    style={c.inPipeline !== false
-                      ? { background: '#d4edda', color: '#2d6a3f', borderColor: '#bfe3c8' }
+                  <span
+                    title={c.source === 'ai' ? 'Added by the AI competitor analysis (locked)' : 'Imported from the uploaded CSV (locked)'}
+                    className="font-mono text-[8.5px] uppercase tracking-[0.05em] px-2 py-0.5 rounded border"
+                    style={c.source === 'ai'
+                      ? { background: '#e9e7fb', color: '#4a3fae', borderColor: '#d8d4f5' }
                       : { background: '#f0ede8', color: '#8a8580', borderColor: '#e0dace' }}
                   >
-                    {c.inPipeline !== false ? 'In Pipeline' : 'Not in Pipeline'}
-                  </button>
+                    {c.source === 'ai' ? 'AI added' : 'CSV'}
+                  </span>
                 </td>
                 <td className="px-4 py-2.5">
                   <button

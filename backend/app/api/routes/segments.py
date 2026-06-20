@@ -12,39 +12,40 @@ from app.api.serializers import company_link_out, segment_out
 from app.config import settings
 from app.db.models import Segment, SegmentSynthesis
 from app.db.session import get_db
-from app.services.research.sources import collect_company_sources
+from app.services.research.sources import deep_research_company
 from app.services.synthesis.chains import synthesize_segment
 from app.services.verification import verification_map
 
 router = APIRouter(prefix="/segments", tags=["segments"])
 
 
-def _collect_segment_sources(db: Session, seg: Segment, *, only_missing: bool = True) -> int:
-    """Deep-research direct source links for each company in the segment and save
-    them to company.extra.sources. Best-effort; returns how many companies got
-    (new) sources."""
-    n = 0
+def _deep_research_segment(db: Session, seg: Segment, *, only_missing: bool = False) -> list[dict]:
+    """Run deep web research for every company in the segment: save the direct
+    source links to company.extra.sources and return per-company text digests
+    (used to ground the LLM synthesis). Best-effort per company."""
+    research: list[dict] = []
+    changed = False
     for link in seg.links:
         c = link.company
         extra = dict(c.extra or {})
         if only_missing and extra.get("sources"):
+            research.append({"name": c.name, "digest": ""})
             continue
         try:
-            links_found = collect_company_sources(
-                c.name,
-                domain=extra.get("website") or extra.get("domain"),
-                description=c.description,
+            r = deep_research_company(
+                c.name, domain=extra.get("website") or extra.get("domain"), description=c.description
             )
         except Exception:  # noqa: BLE001 - research is best-effort
-            links_found = []
-        if links_found:
-            extra["sources"] = links_found
+            r = {"sources": [], "digest": ""}
+        if r["sources"]:
+            extra["sources"] = r["sources"]
             c.extra = extra
             flag_modified(c, "extra")
-            n += 1
-    if n:
+            changed = True
+        research.append({"name": c.name, "digest": r["digest"]})
+    if changed:
         db.commit()
-    return n
+    return research
 
 
 def _verifs(db: Session, seg: Segment) -> dict[str, str]:
@@ -118,9 +119,14 @@ def synthesize(segment_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
 
     seg.status = "synthesizing"
     db.commit()
+
+    # deep research first: collect direct sources per company + grounding digests
+    research = _deep_research_segment(db, seg, only_missing=False)
+
     try:
         result = synthesize_segment(
-            title=seg.title, focal=seg.focal_company, thesis=seg.thesis, companies=companies
+            title=seg.title, focal=seg.focal_company, thesis=seg.thesis,
+            companies=companies, research=research,
         )
     except Exception as exc:  # noqa: BLE001
         seg.status = "ready" if seg.synthesis else "draft"
@@ -142,9 +148,6 @@ def synthesize(segment_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     seg.key_insight = result.key_insight
     seg.status = "ready"
     db.commit()
-
-    # deep-research direct source links per company for the Sources tab
-    _collect_segment_sources(db, seg, only_missing=True)
     db.refresh(seg)
     return segment_out(seg, with_synthesis=True, verifications=_verifs(db, seg))
 
@@ -158,9 +161,9 @@ def collect_sources(segment_id: uuid.UUID, db: Session = Depends(get_db)) -> dic
         raise HTTPException(status_code=404, detail="Segment not found")
     if not seg.links:
         raise HTTPException(status_code=400, detail="Segment has no companies")
-    count = _collect_segment_sources(db, seg, only_missing=False)
+    research = _deep_research_segment(db, seg, only_missing=False)
     db.refresh(seg)
     return {
-        "updated": count,
+        "updated": sum(1 for r in research if r.get("digest")),
         "segment": segment_out(seg, with_synthesis=True, verifications=_verifs(db, seg)),
     }

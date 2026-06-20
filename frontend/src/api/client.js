@@ -35,7 +35,6 @@ export const enrichSector = (id, opts = {}) => send('POST', `/sectors/${id}/enri
 export const deleteSector = (id) => send('DELETE', `/sectors/${id}`)
 
 export const collectSegmentSources = (id) => send('POST', `/segments/${id}/collect-sources`)
-export const setCompanyPipeline = (id, inPipeline) => send('PATCH', `/crm/companies/${id}`, { inPipeline })
 export const moveCompanySegment = (companyId, fromSegmentId, toSegmentId) =>
   send('POST', `/companies/${companyId}/move-segment`, { fromSegmentId, toSegmentId })
 
