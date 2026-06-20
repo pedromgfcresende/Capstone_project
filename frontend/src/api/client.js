@@ -53,6 +53,20 @@ export const getCrmCompanies = (params = {}) => {
   return get('/crm/companies' + (qs ? `?${qs}` : ''))
 }
 
+// CRM CSV re-upload → reconciles against the existing pipeline (name-matched
+// upsert: update Stage/Funding only when changed, add new companies otherwise).
+export async function uploadCrmReconcile(file) {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await fetch(BASE + '/crm/upload', { method: 'POST', body: fd })
+  if (!res.ok) {
+    let detail = res.status
+    try { detail = (await res.json()).detail || detail } catch { /* ignore */ }
+    throw new Error(typeof detail === 'string' ? detail : `upload failed: ${res.status}`)
+  }
+  return res.json()
+}
+
 // Competitor CSV → builds/extends a Sector (segments derived from the Segment column).
 export async function uploadCompetitor({ file, sectorLabel }) {
   const fd = new FormData()

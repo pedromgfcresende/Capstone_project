@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
-import { Search, ChevronRight, ChevronDown, Plus, X, PanelLeftClose, Database } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, PanelLeftClose, Database } from 'lucide-react'
 import XangeLogo from './XangeLogo'
 
 const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSectors, onCollapse, onHome }, ref) {
@@ -10,8 +10,6 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
       setNewWsName({ sectorId, value: '' })
     }
   }))
-  const [mode, setMode] = useState('sector')
-  const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState({})
   const [newSectorName, setNewSectorName] = useState(null)
   const [newWsName, setNewWsName] = useState(null) // sectorId or null
@@ -52,13 +50,7 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
     setNewWsName({ sectorId, value: '' })
   }
 
-  const filtered = sectors.filter(s => {
-    if (!query) return true
-    if (mode === 'sector') return s.label.toLowerCase().includes(query.toLowerCase())
-    return s.workspaces.some(ws =>
-      ws.companies.some(c => c.name.toLowerCase().includes(query.toLowerCase()))
-    )
-  })
+  const filtered = sectors
 
   // Sidebar uses warm pastel from the same palette as the main canvas
   const bg = '#e8e0d4'
@@ -72,18 +64,10 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
       <div className="px-4 pt-5 pb-4 border-b border-rule flex items-start justify-between">
         <button
           onClick={onHome}
-          className="text-left bg-transparent border-0 cursor-pointer p-0 group flex items-center gap-2.5"
+          className="text-left bg-transparent border-0 cursor-pointer p-0 group flex items-center"
           title="Go to home"
         >
-          <XangeLogo size={26} radius={6} />
-          <div>
-            <div className="font-serif font-bold text-[16px] text-ink tracking-tight group-hover:text-accent transition-colors">
-              XAnge<span className="text-accent">.</span>
-            </div>
-            <div className="font-mono text-[9px] text-ink-mute uppercase tracking-[0.15em] mt-0.5">
-              Market Intelligence
-            </div>
-          </div>
+          <XangeLogo size={30} radius={7} />
         </button>
         <button
           onClick={onCollapse}
@@ -108,45 +92,8 @@ const Sidebar = forwardRef(function Sidebar({ selected, onSelect, sectors, setSe
         </button>
       </div>
 
-      {/* Search + mode */}
-      <div className="px-3 pt-3 pb-2">
-        <div className="relative mb-2">
-          <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-mute pointer-events-none" />
-          <input
-            type="text"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder={mode === 'sector' ? 'Search sectors…' : 'Search companies…'}
-            className="w-full border border-rule rounded pl-8 pr-3 py-1.5 font-sans text-[12px] text-ink placeholder:text-ink-mute outline-none focus:border-ink-mute transition-all"
-            style={{ background: 'rgba(255,255,255,0.5)' }}
-          />
-          {query && (
-            <button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-mute hover:text-ink bg-transparent border-0 cursor-pointer p-0">
-              <X size={11} />
-            </button>
-          )}
-        </div>
-
-        {/* Mode toggle */}
-        <div className="flex gap-1">
-          {['sector', 'company'].map(m => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className="flex-1 py-1 rounded font-sans text-[11px] font-medium transition-all cursor-pointer border capitalize"
-              style={mode === m
-                ? { background: '#15063b', color: '#fff', borderColor: '#15063b' }
-                : { background: 'rgba(255,255,255,0.4)', color: '#8a8580', borderColor: '#d8d2c5' }
-              }
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Section label + add */}
-      <div className="flex items-center justify-between px-4 pt-1 pb-1">
+      <div className="flex items-center justify-between px-4 pt-3 pb-1">
         <span className="font-mono text-[9px] text-ink-mute uppercase tracking-[0.15em]">Sectors</span>
         <button
           onClick={() => setNewSectorName('')}

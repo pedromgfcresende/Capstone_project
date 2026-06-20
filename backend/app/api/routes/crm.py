@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,7 @@ from app.db.models import (
     Segment,
 )
 from app.db.session import get_db
+from app.services.ingestion.crm_csv import reconcile_crm_csv
 from app.services.research.enrich import run_enrichment, suggest_sector_segment
 from app.services.research.persist import persist_competitors
 
@@ -74,6 +75,21 @@ def list_crm_companies(
         "offset": offset,
         "items": [crm_company_out(c) for c in rows],
     }
+
+
+@router.post("/upload")
+async def upload_crm_reconcile(
+    db: Session = Depends(get_db), file: UploadFile = File(...)
+) -> dict:
+    """Re-upload a CRM CSV to refresh the pipeline. Existing companies (matched by
+    name) only have Stage / Funding updated when they changed; unseen companies are
+    added as new records. Returns a reconciliation summary."""
+    content = await file.read()
+    try:
+        summary = reconcile_crm_csv(db, content, filename=file.filename)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Reconcile failed: {exc}") from exc
+    return summary
 
 
 @router.get("/companies/{company_id}")

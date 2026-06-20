@@ -7,9 +7,12 @@ import pandas as pd
 from app.services.ingestion.common import build_extra, to_date, to_float, to_int
 from app.services.ingestion.competitor_csv import _norm, _note_in_row, _segments_in_row
 from app.services.ingestion.crm_csv import (
+    _norm_name,
     _row_to_company as crm_row,
     coalesce_duplicate_columns,
+    diff_stage_funding,
 )
+from types import SimpleNamespace
 
 
 def test_scalar_coercion():
@@ -110,3 +113,37 @@ def test_crm_prefers_numeric_employee_over_range():
     # the structured employee columns must not leak into extra
     assert "Number of Employees" not in c.extra
     assert "Employees (Current)" not in c.extra
+
+
+# ── reconcile-upload diff (name-matched upsert) ───────────────────────────────
+def test_reconcile_detects_only_stage_and_funding_changes():
+    existing = SimpleNamespace(
+        name="Acme", investment_stage="Seed",
+        total_funding_eur=1_000_000.0, total_funding_usd=None,
+    )
+    # stage advanced + funding grew -> both flagged
+    incoming = SimpleNamespace(
+        name="Acme", investment_stage="Series A",
+        total_funding_eur=5_000_000.0, total_funding_usd=None,
+    )
+    delta = diff_stage_funding(existing, incoming)
+    assert delta["investment_stage"] == ("Seed", "Series A")
+    assert delta["total_funding_eur"] == (1_000_000.0, 5_000_000.0)
+
+
+def test_reconcile_no_change_returns_empty():
+    existing = SimpleNamespace(investment_stage="Seed", total_funding_eur=1e6, total_funding_usd=None)
+    incoming = SimpleNamespace(investment_stage="Seed", total_funding_eur=1e6, total_funding_usd=None)
+    assert diff_stage_funding(existing, incoming) == {}
+
+
+def test_reconcile_ignores_null_incoming_values():
+    # a blank cell in the new file must not wipe an existing value
+    existing = SimpleNamespace(investment_stage="Series B", total_funding_eur=8e6, total_funding_usd=None)
+    incoming = SimpleNamespace(investment_stage=None, total_funding_eur=None, total_funding_usd=None)
+    assert diff_stage_funding(existing, incoming) == {}
+
+
+def test_norm_name():
+    assert _norm_name("  Gradient   Labs ") == "gradient labs"
+    assert _norm_name(None) == ""

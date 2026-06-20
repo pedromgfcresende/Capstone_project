@@ -30,6 +30,7 @@ from app.services.axes import (
     parse_funding_to_eur,
     parse_year,
 )
+from app.services.stages import normalize_funding_stage
 
 # tier (competitive potential 1/2/3) -> default relation type when AI hasn't
 # inferred one yet. A heuristic the analyst confirms/edits in the Players tab.
@@ -86,6 +87,8 @@ def company_link_out(link: CompanySegment) -> dict:
     # CRM/CSV values are trusted as-is; AI-discovered values need verification
     # before they may plot on the Comparative matrix.
     trusted = c.origin in ("csv", "crm")
+    # consolidate the messy funding string into one canonical stage
+    stage = normalize_funding_stage(c.funding_status)
 
     return {
         "id": str(c.id),
@@ -95,8 +98,9 @@ def company_link_out(link: CompanySegment) -> dict:
         "founded": c.founded,
         "geography": c.geography,
         "location": c.geography,
-        "fundRound": c.funding_status,
-        "round": c.funding_status,
+        "fundRound": stage or c.funding_status,
+        "round": stage or c.funding_status,
+        "roundRaw": c.funding_status,
         "fundingAmount": c.funding_amount,
         "raised": format_eur(funding_eur) or c.funding_amount,
         "topInvestors": c.top_investors,
@@ -126,7 +130,8 @@ def company_matrix_out(c: Company) -> dict:
         "id": str(c.id),
         "name": c.name,
         "geography": c.geography,
-        "fundRound": c.funding_status,
+        "fundRound": normalize_funding_stage(c.funding_status) or c.funding_status,
+        "roundRaw": c.funding_status,
         "founded": c.founded,
         "description": c.description,
         "origin": c.origin,

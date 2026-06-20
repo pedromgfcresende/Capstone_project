@@ -143,6 +143,101 @@ def ingest_crm_frames(
     return upload
 
 
+# ── reconcile upload (upsert against the existing pipeline) ───────────────────
+
+_FUNDING_FIELDS = ("total_funding_eur", "total_funding_usd")
+
+
+def _norm_name(name: str | None) -> str:
+    return re.sub(r"\s+", " ", (name or "").strip()).lower()
+
+
+def diff_stage_funding(existing, incoming) -> dict:
+    """Stage/Funding fields that changed (only counting non-null incoming values).
+
+    Returns {field: (old, new)}. This is the *only* thing a re-upload updates on an
+    already-known company — name, description, etc. are left as-is.
+    """
+    changed: dict = {}
+    new_stage = getattr(incoming, "investment_stage", None)
+    if new_stage and new_stage != getattr(existing, "investment_stage", None):
+        changed["investment_stage"] = (existing.investment_stage, new_stage)
+    for f in _FUNDING_FIELDS:
+        nv = getattr(incoming, f, None)
+        if nv is not None and nv != getattr(existing, f, None):
+            changed[f] = (getattr(existing, f, None), nv)
+    return changed
+
+
+def reconcile_crm_csv(db: Session, content: bytes, filename: str | None = None) -> dict:
+    """Re-upload a CRM CSV and reconcile it against the existing pipeline.
+
+    For each row: if the company name already exists, only update Stage / Funding
+    when they actually changed; if it's new, insert a record. Returns a summary.
+    """
+    import io
+
+    df = pd.read_csv(io.BytesIO(content))
+    df = coalesce_duplicate_columns(df)
+    records = df.to_dict(orient="records")
+
+    # name index of what's already in the pipeline
+    by_name: dict[str, CrmCompany] = {
+        _norm_name(c.name): c for c in db.query(CrmCompany).all()
+    }
+
+    added = unchanged = 0
+    changes: list[dict] = []
+    upload = Upload(kind="crm", filename=filename, status="pending")
+    db.add(upload)
+    try:
+        for row in records:
+            incoming = _row_to_company(row)
+            key = _norm_name(incoming.name)
+            match = by_name.get(key)
+            if match is None and incoming.organization_id:
+                match = (
+                    db.query(CrmCompany)
+                    .filter(CrmCompany.organization_id == incoming.organization_id)
+                    .first()
+                )
+            if match is None:
+                db.add(incoming)
+                by_name[key] = incoming
+                added += 1
+                continue
+
+            delta = diff_stage_funding(match, incoming)
+            if not delta:
+                unchanged += 1
+                continue
+            for field, (_old, new) in delta.items():
+                setattr(match, field, new)
+            changes.append({
+                "name": match.name,
+                "changed": {k: {"from": v[0], "to": v[1]} for k, v in delta.items()},
+            })
+
+        upload.row_count = len(records)
+        upload.status = "done"
+        db.commit()
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        upload.status = "failed"
+        upload.error = str(exc)
+        db.add(upload)
+        db.commit()
+        raise
+
+    return {
+        "added": added,
+        "updated": len(changes),
+        "unchanged": unchanged,
+        "rows": len(records),
+        "changes": changes[:50],
+    }
+
+
 def ingest_crm_files(db: Session, files: dict[str, bytes]) -> Upload:
     """files: {filename: csv_bytes}. lead_status inferred from filename."""
     import io
