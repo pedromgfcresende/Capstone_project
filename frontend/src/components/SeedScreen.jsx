@@ -80,7 +80,7 @@ export default function SeedScreen({ sector, onCreated, onCancel }) {
             onDrop={(e) => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files) }}
             onClick={() => fileInputRef.current?.click()}
             className="border-2 border-dashed rounded-lg px-5 py-8 flex items-center gap-3 cursor-pointer transition-all"
-            style={{ borderColor: dragging ? '#ff7a45' : '#d8d2c5', background: dragging ? '#ffe5d8' : '#fff' }}
+            style={{ borderColor: dragging ? '#6a5cd6' : '#d8d2c5', background: dragging ? '#e9e7fb' : '#fff' }}
           >
             <Upload size={18} className="text-ink-mute shrink-0" />
             <div className="flex-1">
@@ -109,7 +109,7 @@ export default function SeedScreen({ sector, onCreated, onCancel }) {
             disabled={!canSubmit}
             className="self-start flex items-center gap-2 px-7 py-3.5 rounded-lg font-sans text-[13.5px] font-semibold transition-all cursor-pointer border-0 mt-1"
             style={canSubmit ? { background: '#15063b', color: '#fff' } : { background: '#d8d2c5', color: '#8a8580', cursor: 'not-allowed' }}
-            onMouseEnter={(e) => { if (canSubmit) e.currentTarget.style.background = '#ff7a45' }}
+            onMouseEnter={(e) => { if (canSubmit) e.currentTarget.style.background = '#6a5cd6' }}
             onMouseLeave={(e) => { if (canSubmit) e.currentTarget.style.background = '#15063b' }}
           >
             {busy ? <><RefreshCw size={14} className="animate-spin" /> Building sector…</> : <><Sparkles size={14} /> Create sector</>}

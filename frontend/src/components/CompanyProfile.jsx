@@ -14,7 +14,7 @@ function InlineText({ value, onChange, multiline = false, placeholder = '—', c
         className={`bg-white border border-rule rounded-md px-3 py-2 outline-none resize-none w-full leading-relaxed ${className}`} />
       <div className="flex gap-2">
         <button onClick={save} className="font-mono text-[9px] uppercase tracking-[0.08em] px-2.5 py-1 rounded bg-ink text-white border-0 cursor-pointer"
-          onMouseEnter={e => e.currentTarget.style.background = '#ff7a45'} onMouseLeave={e => e.currentTarget.style.background = '#15063b'}>Save</button>
+          onMouseEnter={e => e.currentTarget.style.background = '#6a5cd6'} onMouseLeave={e => e.currentTarget.style.background = '#15063b'}>Save</button>
         <button onClick={cancel} className="font-mono text-[9px] uppercase tracking-[0.08em] px-2.5 py-1 rounded bg-transparent border border-rule text-ink-mute cursor-pointer hover:text-ink">Cancel</button>
       </div>
     </div>

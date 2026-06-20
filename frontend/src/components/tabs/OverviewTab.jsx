@@ -66,7 +66,7 @@ function SignalCard({ icon: Icon, iconColor, label, items }) {
 }
 
 const IMPACT_COLORS = {
-  High:   { bg: '#ffe5d8', text: '#c04a22' },
+  High:   { bg: '#fbe3dc', text: '#c04a22' },
   Medium: { bg: '#fff3cd', text: '#856404' },
   Low:    { bg: '#f0ede8', text: '#8a8580' },
 }
@@ -98,7 +98,7 @@ export default function OverviewTab({ workspace }) {
 
         {/* AI-estimated banner */}
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-rule bg-accent-soft/40"
-          style={{ background: hasMarket ? '#fff1ea' : '#fff' }}>
+          style={{ background: hasMarket ? '#f1effb' : '#fff' }}>
           <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-accent-deep">
             {hasMarket ? 'AI-estimated market read — verify before use' : 'No market read yet'}
           </span>
@@ -143,7 +143,7 @@ export default function OverviewTab({ workspace }) {
                     <span className="font-mono text-[8px] uppercase tracking-[0.06em] px-1.5 py-0.5 rounded" style={{ background: '#d4edda', color: '#2d6a3f' }}>✓ Venture-scale</span>
                   )}
                 </div>
-                <div className="font-serif text-[28px] font-semibold text-ink">{value || '—'}</div>
+                <div className="font-sans text-[26px] font-bold text-ink tracking-tight">{value || '—'}</div>
                 <div className="font-sans text-[11px] text-ink-mute">{sub}</div>
                 <div className="font-sans text-[11px] text-ink-soft italic">{flagLabel}</div>
               </div>

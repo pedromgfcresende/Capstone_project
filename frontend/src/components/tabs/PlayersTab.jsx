@@ -9,7 +9,7 @@ import { ChevronRight, ChevronDown, Sparkles } from 'lucide-react'
 // (Spec: Tab Content Refinement.pdf — Players Overview Tab)
 
 const TYPE_STYLE = {
-  direct:   { bg: '#ffe5d8', text: '#c0420c', label: 'direct' },
+  direct:   { bg: '#e9e7fb', text: '#4a3fae', label: 'direct' },
   indirect: { bg: '#f5edcf', text: '#8a6d1f', label: 'indirect' },
   adjacent: { bg: '#ece8e1', text: '#6a6560', label: 'adjacent' },
 }

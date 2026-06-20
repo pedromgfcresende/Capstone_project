@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { ArrowRight, Search, X, Sparkles, ChevronDown, ChevronUp, Send, Target, TrendingUp, Radio, Layers, RefreshCw, Pencil, Plus } from 'lucide-react'
+import { ArrowRight, Search, X, Sparkles, ChevronDown, ChevronUp, Send, Target, Radio, Layers, RefreshCw, Pencil } from 'lucide-react'
 import { segmentOverview, FALLBACK_OVERVIEW } from '../data/segmentOverview'
 import CompanyProfile from './CompanyProfile'
 import { VerifyDot, VerifyLegend, useVerifyMap } from './VerifyDot'
@@ -8,7 +8,7 @@ import { synthesizeSector, askSector, patchSector, enrichSector } from '../api/c
 const SIGNAL_COLORS = {
   'Funding':    { bg: '#d4edda', text: '#2d6a3f' },
   'M&A':        { bg: '#e8e0f8', text: '#5a3d9a' },
-  'Regulatory': { bg: '#ffe5d8', text: '#c04a22' },
+  'Regulatory': { bg: '#e9e7fb', text: '#c04a22' },
   'Trend':      { bg: '#e8f0fe', text: '#2a5fd4' },
   'Exit':       { bg: '#fff3cd', text: '#856404' },
 }
@@ -23,30 +23,53 @@ const MOMENTUM = {
 // canonical consolidated funding stages (matches backend normalize_funding_stage)
 const ROUND_ORDER = ['Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Series D', 'Public', 'Acquired']
 
-// Non-destructive segment consolidation for the Sector view: cluster the
-// fine-grained segments into fewer themed groups by their most common shared
-// keyword. Purely a display roll-up — the underlying segments are never changed.
-const SEG_STOP = new Set(['the', 'and', 'for', 'of', 'a', 'to', 'in', 'on', 'with', 'based', 'native', 'ai', 'co', 'vs', 'de', 'as'])
+// Consolidate geography to a single country, so "San Francisco, USA" and "USA"
+// (or "Berlin, Germany" and "Germany") count as one entry on the Sector page.
+const GEO_CANON = {
+  'usa': 'USA', 'us': 'USA', 'u.s.': 'USA', 'u.s.a': 'USA', 'united states': 'USA',
+  'uk': 'UK', 'u.k.': 'UK', 'united kingdom': 'UK', 'england': 'UK', 'britain': 'UK', 'gb': 'UK',
+}
+function normalizeGeo(s) {
+  if (!s) return null
+  const part = String(s).split(',').pop().trim()       // country is after the last comma
+  const key = part.toLowerCase().replace(/\.+$/, '')
+  return GEO_CANON[key] || part
+}
+
+// Non-destructive segment consolidation for the Sector view: merge segments that
+// share a ≥2-word phrase (e.g. "Horizontal Support Platform" + "Horizontal
+// Support Voice" -> "Horizontal Support") into one row. Purely a display roll-up —
+// the underlying segments are never changed.
+const SEG_STOP = new Set(['the', 'and', 'for', 'of', 'a', 'to', 'in', 'on', 'with', 'based', 'native', 'ai', 'co', 'vs', 'de', 'as', 'platform', 'solution', 'tool', 'tools'])
 function segTokens(title) {
   return (title || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)
     .filter(w => w.length >= 2 && !SEG_STOP.has(w))
 }
 function consolidateSegments(rows) {
-  if (rows.length <= 3) return [{ label: 'All segments', rows }]
-  const freq = {}
-  rows.forEach(r => new Set(segTokens(r.title)).forEach(w => { freq[w] = (freq[w] || 0) + 1 }))
-  const groups = {}
-  const other = []
-  rows.forEach(r => {
-    const toks = segTokens(r.title).filter(w => freq[w] >= 2).sort((a, b) => freq[b] - freq[a])
-    if (!toks.length) { other.push(r); return }
-    ;(groups[toks[0]] ||= []).push(r)
+  if (rows.length <= 2) return rows.map(r => ({ label: r.title, rows: [r] }))
+  const sets = rows.map(r => new Set(segTokens(r.title)))
+  const shared = (a, b) => { let n = 0; for (const t of a) if (b.has(t)) n++; return n }
+  // union-find: merge any two segments sharing ≥2 significant tokens
+  const parent = rows.map((_, i) => i)
+  const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x] } return x }
+  for (let i = 0; i < rows.length; i++)
+    for (let j = i + 1; j < rows.length; j++)
+      if (shared(sets[i], sets[j]) >= 2) parent[find(i)] = find(j)
+  const byRoot = {}
+  rows.forEach((r, i) => { (byRoot[find(i)] ||= []).push(i) })
+  const titleCase = (w) => w.charAt(0).toUpperCase() + w.slice(1)
+  const groups = Object.values(byRoot).map(idxs => {
+    const groupRows = idxs.map(i => rows[i])
+    if (groupRows.length === 1) return { label: groupRows[0].title, rows: groupRows }
+    // label = tokens common to ALL members, in the order of the longest title
+    let common = null
+    idxs.forEach(i => { common = common === null ? new Set(sets[i]) : new Set([...common].filter(t => sets[i].has(t))) })
+    const longest = groupRows.reduce((a, b) => (b.title.length > a.title.length ? b : a))
+    const ordered = segTokens(longest.title).filter(t => common.has(t))
+    const label = ordered.length ? ordered.map(titleCase).join(' ') : groupRows[0].title
+    return { label, rows: groupRows }
   })
-  const result = Object.entries(groups)
-    .sort((a, b) => b[1].length - a[1].length)
-    .map(([k, rs]) => ({ label: k.charAt(0).toUpperCase() + k.slice(1), rows: rs }))
-  if (other.length) result.push({ label: 'Other', rows: other })
-  return result
+  return groups.sort((a, b) => b.rows.length - a.rows.length)
 }
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
 const parseDate = (s) => {
@@ -112,7 +135,7 @@ function InlineText({ value, onChange, multiline = false, placeholder = 'Click t
         className={`bg-white border border-rule rounded-md px-3 py-2 outline-none resize-none w-full leading-relaxed ${className}`} />
       <div className="flex gap-2">
         <button onClick={save} className="font-mono text-[9px] uppercase tracking-[0.08em] px-2.5 py-1 rounded bg-ink text-white border-0 cursor-pointer"
-          onMouseEnter={e => e.currentTarget.style.background = '#ff7a45'} onMouseLeave={e => e.currentTarget.style.background = '#15063b'}>Save</button>
+          onMouseEnter={e => e.currentTarget.style.background = '#6a5cd6'} onMouseLeave={e => e.currentTarget.style.background = '#15063b'}>Save</button>
         <button onClick={cancel} className="font-mono text-[9px] uppercase tracking-[0.08em] px-2.5 py-1 rounded bg-transparent border border-rule text-ink-mute cursor-pointer hover:text-ink">Cancel</button>
       </div>
     </div>
@@ -160,12 +183,6 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
     workspaces.flatMap(ws => (ws.companies || []).map(co => ({ ...co, workspaceTitle: ws.title, workspaceId: ws.id }))),
     [workspaces]
   )
-  const companyByName = useMemo(() => {
-    const map = {}
-    allCompanies.forEach(co => { map[co.name.toLowerCase()] = co })
-    return map
-  }, [allCompanies])
-
   // Aggregate: stage distribution
   const roundCounts = useMemo(() => {
     const counts = {}
@@ -178,15 +195,12 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
   // Aggregate: geography
   const geoCounts = useMemo(() => {
     const counts = {}
-    allCompanies.forEach(co => { if (co.geography) counts[co.geography] = (counts[co.geography] || 0) + 1 })
+    allCompanies.forEach(co => {
+      const geo = normalizeGeo(co.geography)
+      if (geo) counts[geo] = (counts[geo] || 0) + 1
+    })
     return Object.entries(counts).sort((a, b) => b[1] - a[1])
   }, [allCompanies])
-
-  // Priority watchlist from the sector's AI synthesis
-  const derivedWatchlist = useMemo(() =>
-    (sector?.synthesisExtra?.watchlist || []).map(w => ({ name: w.name, reason: w.reason, segment: '', wsId: null })),
-    [sector]
-  )
 
   // Roll-up: signals timeline (regulatory + M&A from each segment overview)
   const signals = useMemo(() => {
@@ -215,6 +229,22 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
     [workspaces]
   )
 
+  // Consolidated segment rows: each themed group collapses to a single row that
+  // sums its companies and points to the largest constituent segment.
+  const consolidatedGroups = useMemo(() => {
+    return consolidateSegments(segmentRows).map(g => {
+      const primary = [...g.rows].sort((a, b) => b.companies - a.companies)[0]
+      return {
+        id: primary.id,
+        title: g.label,
+        focal: g.rows.find(r => r.focal)?.focal || null,
+        companies: g.rows.reduce((s, r) => s + r.companies, 0),
+        tam: primary.tam, cagr: primary.cagr, stage: primary.stage,
+        merged: g.rows.length > 1 ? g.rows.map(r => r.title) : null,
+      }
+    })
+  }, [segmentRows])
+
   const derivedHeadline = sector?.synthesisHeadline || ''
   const derivedBody = sector?.synthesisBody || ''
 
@@ -231,21 +261,13 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
   // Editable synthesis state — seeded from the roll-up, re-seeded on sector change or re-synthesise.
   const [headline, setHeadline] = useState(derivedHeadline)
   const [thesis, setThesis] = useState(derivedBody)
-  const [watchlist, setWatchlist] = useState(derivedWatchlist)
-  const [groupSegs, setGroupSegs] = useState(false)  // non-destructive segment consolidation (display only)
+  const [groupSegs, setGroupSegs] = useState(true)  // segments shown consolidated by default (display only)
 
   useEffect(() => {
     setHeadline(derivedHeadline)
     setThesis(derivedBody)
-    setWatchlist(derivedWatchlist)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sector.id])
-
-  // Watchlist editing
-  const updateWatchName = (i, v) => setWatchlist(p => p.map((x, j) => j === i ? { ...x, name: v } : x))
-  const updateWatchReason = (i, v) => setWatchlist(p => p.map((x, j) => j === i ? { ...x, reason: v } : x))
-  const removeWatch = (i) => setWatchlist(p => p.filter((_, j) => j !== i))
-  const addWatch = () => setWatchlist(p => [...p, { name: '', reason: '', segment: '', wsId: null }])
 
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
@@ -277,7 +299,6 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
       const s = await synthesizeSector(sector.id)
       setHeadline(s.synthesisHeadline || '')
       setThesis(s.synthesisBody || '')
-      setWatchlist((s.synthesisExtra?.watchlist || []).map(w => ({ name: w.name, reason: w.reason, segment: '', wsId: null })))
       onSectorUpdated?.(s)
     } catch (e) {
       setSaveMsg(`Synthesis failed: ${e.message}`)
@@ -294,7 +315,6 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
         synthesisBody: thesis,
         synthesisExtra: {
           ...(sector.synthesisExtra || {}),
-          watchlist: watchlist.map(w => ({ name: w.name, reason: w.reason })),
         },
       })
       onSectorUpdated?.(s)
@@ -342,7 +362,7 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
             title="AI market research — find competitors not in our CRM (web + LLM)"
             className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.1em] px-3 py-1.5 rounded transition-all cursor-pointer disabled:opacity-50 border-0"
             style={{ background: enriching ? '#d8d2c5' : '#15063b', color: enriching ? '#8a8580' : '#fff' }}
-            onMouseEnter={e => { if (!enriching) e.currentTarget.style.background = '#ff7a45' }}
+            onMouseEnter={e => { if (!enriching) e.currentTarget.style.background = '#6a5cd6' }}
             onMouseLeave={e => { if (!enriching) e.currentTarget.style.background = '#15063b' }}
           >
             {enriching ? <><RefreshCw size={11} className="animate-spin" /> Researching…</> : <><Sparkles size={11} /> Find competitors</>}
@@ -448,7 +468,7 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
                     {roundCounts.map(([round, count]) => (
                       <div key={round} className="flex flex-col items-center gap-1.5 flex-1">
                         <span className="font-mono text-[10px] text-ink-soft">{count}</span>
-                        <div className="w-full rounded-t" style={{ height: `${(count / maxRound) * 44 + 4}px`, background: '#ff7a45' }} />
+                        <div className="w-full rounded-t" style={{ height: `${(count / maxRound) * 44 + 4}px`, background: '#6a5cd6' }} />
                         <span className="font-mono text-[8px] text-ink-mute text-center leading-tight">{round}</span>
                       </div>
                     ))}
@@ -475,7 +495,7 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
               <div className="bg-white border border-rule rounded-lg overflow-hidden">
 
                 {/* Headline bet — the punchline, large serif */}
-                <div className="px-6 pt-6 pb-5 border-b border-rule" style={{ background: 'linear-gradient(180deg, #fff1ea 0%, #ffffff 100%)' }}>
+                <div className="px-6 pt-6 pb-5 border-b border-rule" style={{ background: 'linear-gradient(180deg, #f1effb 0%, #ffffff 100%)' }}>
                   <div className="flex items-center gap-2 mb-2.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-accent" />
                     <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-accent-deep">The bet</span>
@@ -498,7 +518,7 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
                     <span className="font-mono text-[8.5px] uppercase tracking-[0.12em] text-ink-mute">Maturity across segments</span>
                     <div className="mt-4 mb-2 relative">
                       {/* track */}
-                      <div className="relative h-1.5 rounded-full" style={{ background: 'linear-gradient(to right, #e8e0d4, #ff7a45)' }}>
+                      <div className="relative h-1.5 rounded-full" style={{ background: 'linear-gradient(to right, #e8e0d4, #6a5cd6)' }}>
                         {maturity.map((m) => (
                           <div key={m.id} className="absolute -translate-x-1/2" style={{ left: `${m.pos}%`, top: -3 }}>
                             <div className="w-3 h-3 rounded-full bg-white border-2 shadow-sm" style={{ borderColor: '#15063b' }} title={`${m.title} · ${m.stage}`} />
@@ -530,17 +550,17 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
             {/* ── Segment comparison (aggregated + entry points) ── */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <SectionHeader icon={Layers} label="Segments" count={workspaces.length} />
-                {segmentRows.length > 3 && (
+                <SectionHeader icon={Layers} label="Segments" count={groupSegs ? consolidatedGroups.length : workspaces.length} />
+                {segmentRows.length > 2 && (
                   <button
                     onClick={() => setGroupSegs(g => !g)}
-                    title="Group fine-grained segments into fewer themes (display only — no data is changed)"
+                    title="Consolidate related segments into fewer themes (display only — no data is changed)"
                     className="flex items-center gap-1.5 font-mono text-[8.5px] uppercase tracking-[0.08em] px-2.5 py-1.5 rounded border cursor-pointer transition-all mb-3"
                     style={groupSegs
                       ? { background: '#15063b', color: '#fff', borderColor: '#15063b' }
                       : { background: '#fff', color: '#6a6560', borderColor: '#d8d2c5' }}
                   >
-                    <Layers size={10} /> {groupSegs ? 'Grouped' : 'Consolidate'}
+                    <Layers size={10} /> {groupSegs ? 'Consolidated' : 'Show all'}
                   </button>
                 )}
               </div>
@@ -556,41 +576,31 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
                       <span key={i} className="font-mono text-[8.5px] uppercase tracking-[0.1em] text-ink-mute">{h}</span>
                     ))}
                   </div>
-                  {(() => {
-                    const segRow = (row) => {
-                      const m = MOMENTUM[row.stage] || { label: row.stage || '—', bg: '#f0ede8', text: '#8a8580' }
-                      return (
-                        <div key={row.id} className="grid items-center px-4 py-3.5 border-b border-rule last:border-b-0 hover:bg-bg transition-colors" style={{ gridTemplateColumns: '1fr 130px 70px 80px 150px 110px' }}>
-                          <div className="flex flex-col gap-0.5 min-w-0 pr-3">
-                            <span className="font-sans text-[13px] font-semibold text-ink truncate">{row.title}</span>
-                            {row.focal && <span className="font-sans text-[11px] text-ink-mute truncate">Focal · {row.focal}</span>}
-                          </div>
-                          <span className="font-mono text-[9px] uppercase tracking-[0.05em] px-2 py-0.5 rounded w-fit" style={{ background: m.bg, color: m.text }}>{m.label}</span>
-                          <span className="font-sans text-[12.5px] text-ink-soft">{row.companies}</span>
-                          <span className="font-serif text-[14px] font-semibold text-ink">{row.tam || '—'}</span>
-                          <span className="font-mono text-[11px] text-ink-soft">{row.cagr || '—'}</span>
-                          <button
-                            onClick={() => onSelect({ type: 'workspace', id: row.id, sectorId: sector.id })}
-                            className="flex items-center gap-1.5 font-sans text-[11.5px] font-medium px-3 py-1.5 rounded-md bg-ink text-white border-0 cursor-pointer transition-all w-fit justify-self-end"
-                            onMouseEnter={e => e.currentTarget.style.background = '#ff7a45'}
-                            onMouseLeave={e => e.currentTarget.style.background = '#15063b'}
-                          >
-                            Enter <ArrowRight size={11} />
-                          </button>
+                  {(groupSegs ? consolidatedGroups : segmentRows).map(row => {
+                    const m = MOMENTUM[row.stage] || { label: row.stage || '—', bg: '#f0ede8', text: '#8a8580' }
+                    return (
+                      <div key={row.id} className="grid items-center px-4 py-3.5 border-b border-rule last:border-b-0 hover:bg-bg transition-colors" style={{ gridTemplateColumns: '1fr 130px 70px 80px 150px 110px' }}>
+                        <div className="flex flex-col gap-0.5 min-w-0 pr-3">
+                          <span className="font-sans text-[13px] font-semibold text-ink truncate">{row.title}</span>
+                          {row.merged
+                            ? <span className="font-sans text-[10.5px] text-ink-mute truncate" title={row.merged.join(' · ')}>Merged · {row.merged.join(' · ')}</span>
+                            : row.focal && <span className="font-sans text-[11px] text-ink-mute truncate">Focal · {row.focal}</span>}
                         </div>
-                      )
-                    }
-                    if (!groupSegs) return segmentRows.map(segRow)
-                    return consolidateSegments(segmentRows).map(group => (
-                      <div key={group.label}>
-                        <div className="px-4 py-2 bg-bg border-b border-rule flex items-center gap-2">
-                          <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft font-semibold">{group.label}</span>
-                          <span className="font-mono text-[9px] text-ink-mute">· {group.rows.length} segment{group.rows.length !== 1 ? 's' : ''}</span>
-                        </div>
-                        {group.rows.map(segRow)}
+                        <span className="font-mono text-[9px] uppercase tracking-[0.05em] px-2 py-0.5 rounded w-fit" style={{ background: m.bg, color: m.text }}>{m.label}</span>
+                        <span className="font-sans text-[12.5px] text-ink-soft">{row.companies}</span>
+                        <span className="font-sans text-[13px] font-semibold text-ink">{row.tam || '—'}</span>
+                        <span className="font-mono text-[11px] text-ink-soft">{row.cagr || '—'}</span>
+                        <button
+                          onClick={() => onSelect({ type: 'workspace', id: row.id, sectorId: sector.id })}
+                          className="flex items-center gap-1.5 font-sans text-[11.5px] font-medium px-3 py-1.5 rounded-md bg-ink text-white border-0 cursor-pointer transition-all w-fit justify-self-end"
+                          onMouseEnter={e => e.currentTarget.style.background = '#6a5cd6'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#15063b'}
+                        >
+                          Enter <ArrowRight size={11} />
+                        </button>
                       </div>
-                    ))
-                  })()}
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -636,7 +646,7 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
                                 <td key={s.id} className="px-2 py-1.5 text-center">
                                   {m ? (
                                     <span className="inline-flex items-center justify-center w-5 h-5 rounded-full font-mono text-[9px] font-semibold"
-                                      style={{ background: m.focal ? '#ffe5d8' : '#ff7a45', color: m.focal ? '#c0420c' : '#fff' }}
+                                      style={{ background: m.focal ? '#e9e7fb' : '#6a5cd6', color: m.focal ? '#4a3fae' : '#fff' }}
                                       title={`${c.name} · ${s.title}${m.tier ? ` · tier ${m.tier}` : ''}`}>
                                       {m.focal ? '★' : (m.tier ?? '•')}
                                     </span>
@@ -698,52 +708,6 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated }) {
                 </div>
               )
             })()}
-
-            {/* ── Priority watchlist (roll-up, editable) ── */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <SectionHeader icon={TrendingUp} label="Priority Watchlist" count={watchlist.length} />
-                <button onClick={addWatch}
-                  className="flex items-center gap-1 font-mono text-[8.5px] uppercase tracking-[0.08em] text-ink-mute hover:text-ink bg-transparent border-0 cursor-pointer transition-colors mb-3">
-                  <Plus size={10} /> Add
-                </button>
-              </div>
-              <div className="bg-white border border-rule rounded-lg overflow-hidden divide-y divide-rule">
-                {watchlist.length === 0 && (
-                  <div className="px-4 py-5 font-sans text-[12.5px] text-ink-mute italic text-center">No priority companies yet — click Add, or Re-synthesise to pull from segments.</div>
-                )}
-                {watchlist.map((pc, i) => (
-                  <div key={i} className="flex items-start gap-4 px-4 py-3.5 hover:bg-bg transition-colors group">
-                    <div className="shrink-0 w-[120px]">
-                      <InlineText value={pc.name} onChange={v => updateWatchName(i, v)} placeholder="Company"
-                        className="font-sans text-[13px] font-semibold text-ink" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <InlineText value={pc.reason} onChange={v => updateWatchReason(i, v)} placeholder="Why is this on the radar?"
-                        className="font-sans text-[12.5px] text-ink-soft leading-relaxed" />
-                    </div>
-                    {companyByName[pc.name?.toLowerCase()] && (
-                      <button
-                        onClick={() => setProfileCompany(companyByName[pc.name.toLowerCase()])}
-                        className="flex items-center gap-1 font-mono text-[8px] uppercase tracking-[0.06em] text-accent-deep bg-accent-soft px-1.5 py-0.5 rounded border border-accent-soft shrink-0 mt-0.5 cursor-pointer hover:border-accent transition-colors whitespace-nowrap"
-                        title={`Open ${pc.name} profile`}
-                      >Profile</button>
-                    )}
-                    {pc.wsId && (
-                      <button
-                        onClick={() => onSelect({ type: 'workspace', id: pc.wsId, sectorId: sector.id })}
-                        className="font-mono text-[8px] uppercase tracking-[0.06em] text-ink-mute hover:text-ink bg-bg px-1.5 py-0.5 rounded border border-rule shrink-0 mt-0.5 cursor-pointer transition-colors whitespace-nowrap max-w-[130px] truncate"
-                        title={pc.segment}
-                      >{pc.segment}</button>
-                    )}
-                    <button onClick={() => removeWatch(i)}
-                      className="shrink-0 text-ink-mute hover:text-red-500 bg-transparent border-0 cursor-pointer opacity-0 group-hover:opacity-100 transition-all p-0.5 mt-0.5">
-                      <X size={12} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
 
             {/* ── Signals timeline (roll-up) ── */}
             {signals.length > 0 && (

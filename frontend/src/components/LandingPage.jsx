@@ -107,7 +107,7 @@ export default function LandingPage({ sectors, onSelect, onNewSector, onOpenCrm,
           <button
             onClick={onNewSector}
             className="flex items-center gap-3 px-5 py-4 bg-ink text-white rounded-lg font-sans text-[13.5px] font-semibold transition-all cursor-pointer border-0 text-left group"
-            onMouseEnter={e => e.currentTarget.style.background = '#ff7a45'}
+            onMouseEnter={e => e.currentTarget.style.background = '#6a5cd6'}
             onMouseLeave={e => e.currentTarget.style.background = '#15063b'}
           >
             <div className="w-7 h-7 rounded bg-white/15 flex items-center justify-center shrink-0">

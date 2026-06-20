@@ -23,7 +23,7 @@ const QUADRANTS = {
   employees: { tl: 'Bootstrapped scale', tr: 'Scaling', bl: 'Early · lean', br: 'Capital-efficient' },
 }
 
-const COLORS = { focal: { bg: '#ff9060', border: '#ff7a45' }, default: { bg: '#15063b', border: '#15063b' } }
+const COLORS = { focal: { bg: '#8b80e6', border: '#6a5cd6' }, default: { bg: '#15063b', border: '#15063b' } }
 
 // Bounded, monotonic placement centred on the cutoff (value==cutoff -> 50%).
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
@@ -211,8 +211,8 @@ export default function ComparativeTab({ workspace }) {
           >
             {/* cutoff lines */}
             <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute top-1/2 left-0 right-0 border-t border-dashed" style={{ borderColor: '#ff7a45' }} />
-              <div className="absolute left-1/2 top-0 bottom-0 border-l border-dashed" style={{ borderColor: '#ff7a45' }} />
+              <div className="absolute top-1/2 left-0 right-0 border-t border-dashed" style={{ borderColor: '#6a5cd6' }} />
+              <div className="absolute left-1/2 top-0 bottom-0 border-l border-dashed" style={{ borderColor: '#6a5cd6' }} />
               <span className="absolute left-1/2 bottom-1 -translate-x-1/2 font-mono text-[8px] text-accent-deep bg-white/80 px-1 rounded">{fmtFunding(cfg.fundingCutoffEur)}</span>
               <span className="absolute top-1/2 left-1 -translate-y-1/2 font-mono text-[8px] text-accent-deep bg-white/80 px-1 rounded">{yMode === 'year' ? cfg.yearFoundedCutoff : cfg.employeeCutoff}</span>
             </div>
@@ -279,7 +279,7 @@ export default function ComparativeTab({ workspace }) {
             <span className="font-sans text-[11.5px] text-ink-soft">Competitor</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ background: '#ff9060' }} />
+            <div className="w-3 h-3 rounded-full" style={{ background: '#8b80e6' }} />
             <span className="font-sans text-[11.5px] text-ink-soft">Focal company</span>
           </div>
           <div className="flex items-center gap-2">

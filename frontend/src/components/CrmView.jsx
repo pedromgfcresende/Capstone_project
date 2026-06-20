@@ -94,12 +94,12 @@ export default function CrmView({ onAnalysed }) {
       {(uploadSummary || uploadError) && (
         <div className="px-8 py-2.5 border-b border-rule shrink-0 flex items-center gap-3 bg-bg-card">
           {uploadError ? (
-            <span className="font-sans text-[12.5px]" style={{ color: '#c0420c' }}>Upload failed: {uploadError}</span>
+            <span className="font-sans text-[12.5px]" style={{ color: '#4a3fae' }}>Upload failed: {uploadError}</span>
           ) : (
             <>
               <Check size={14} className="text-good shrink-0" />
               <span className="font-sans text-[12.5px] text-ink-soft">
-                Reconciled {uploadSummary.rows} rows · <b className="text-good">{uploadSummary.added}</b> added · <b style={{ color: '#c0420c' }}>{uploadSummary.updated}</b> updated (stage/funding) · {uploadSummary.unchanged} unchanged
+                Reconciled {uploadSummary.rows} rows · <b className="text-good">{uploadSummary.added}</b> added · <b style={{ color: '#4a3fae' }}>{uploadSummary.updated}</b> updated (stage/funding) · {uploadSummary.unchanged} unchanged
               </span>
               <button onClick={() => setUploadSummary(null)} className="ml-auto text-ink-mute hover:text-ink bg-transparent border-0 cursor-pointer p-0"><X size={13} /></button>
             </>
@@ -142,7 +142,7 @@ export default function CrmView({ onAnalysed }) {
 
       {(analysingId || analyseError) && (
         <div className="px-8 py-2 border-b border-rule bg-bg-card shrink-0 font-sans text-[12px]"
-          style={{ color: analyseError ? '#c0420c' : '#8a8580' }}>
+          style={{ color: analyseError ? '#4a3fae' : '#8a8580' }}>
           {analyseError ? `Analyse failed: ${analyseError}` : 'AI market research running (suggest sector + segment, then web research)… ~1 min.'}
         </div>
       )}

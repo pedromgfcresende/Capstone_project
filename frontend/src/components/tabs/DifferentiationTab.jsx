@@ -90,7 +90,7 @@ function ScoreDots({ score, onChange }) {
       {[1, 2, 3].map(n => (
         <button key={n} onClick={() => onChange(n)}
           className="w-2.5 h-2.5 rounded-full border-0 p-0 cursor-pointer hover:scale-125 transition-transform"
-          style={{ background: n <= score ? '#ff7a45' : '#ece8e1' }} />
+          style={{ background: n <= score ? '#6a5cd6' : '#ece8e1' }} />
       ))}
     </div>
   )
