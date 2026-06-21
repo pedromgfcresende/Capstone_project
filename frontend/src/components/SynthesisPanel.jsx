@@ -1,5 +1,18 @@
 import { Sparkles } from 'lucide-react'
 
+// Bold every mention of the focal company so the reader instantly sees which
+// company the synthesis is centred on.
+function highlightFocal(text, focal) {
+  if (!text || !focal) return text
+  const safe = focal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const parts = String(text).split(new RegExp(`(${safe})`, 'gi'))
+  return parts.map((part, i) =>
+    part.toLowerCase() === focal.toLowerCase()
+      ? <strong key={i} className="font-semibold text-ink">{part}</strong>
+      : part
+  )
+}
+
 function Section({ label, children }) {
   if (!children) return null
   return (
@@ -10,7 +23,7 @@ function Section({ label, children }) {
   )
 }
 
-export default function SynthesisPanel({ synthesis, keyInsight }) {
+export default function SynthesisPanel({ synthesis, keyInsight, focal }) {
   if (!synthesis) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
@@ -38,8 +51,14 @@ export default function SynthesisPanel({ synthesis, keyInsight }) {
 
       {/* Executive summary + key insight */}
       <div className="bg-white border border-rule rounded-lg overflow-hidden">
+        {focal && (
+          <div className="px-6 pt-4 -mb-1 flex items-center gap-2">
+            <span className="font-mono text-[8px] uppercase tracking-[0.06em] text-accent-deep bg-accent-soft px-2 py-1 rounded-full border border-accent-soft">Focal · {focal}</span>
+            <span className="font-sans text-[11px] text-ink-mute">synthesis is centred on this company</span>
+          </div>
+        )}
         <div className="px-6 py-5">
-          <p className="font-sans text-[14px] text-ink leading-relaxed">{txt(synthesis.summary)}</p>
+          <p className="font-sans text-[14px] text-ink leading-relaxed">{highlightFocal(txt(synthesis.summary), focal)}</p>
         </div>
         {keyInsight && (
           <div className="px-6 py-4 border-t border-rule" style={{ background: 'linear-gradient(180deg,#f1effb,#fff)' }}>
@@ -47,7 +66,7 @@ export default function SynthesisPanel({ synthesis, keyInsight }) {
               <span className="w-1.5 h-1.5 rounded-full bg-accent" />
               <span className="font-mono text-[8px] uppercase tracking-[0.14em] text-accent-deep">Key insight</span>
             </div>
-            <p className="font-sans text-[13px] text-ink leading-relaxed">{keyInsight}</p>
+            <p className="font-sans text-[13px] text-ink leading-relaxed">{highlightFocal(keyInsight, focal)}</p>
           </div>
         )}
       </div>

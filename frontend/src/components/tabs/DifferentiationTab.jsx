@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Pencil, X, Plus, Crosshair, Search } from 'lucide-react'
+import { VerifyDot, VerifyLegend, useVerifyMap } from '../VerifyDot'
 
 // ── Differentiation Tab ───────────────────────────────────────────────────────
 // Two paths, one content structure (Tab Content Refinement.pdf):
@@ -163,6 +164,7 @@ export default function DifferentiationTab({ workspace }) {
   const [side, setSide] = useState({})       // id -> {rowKey: text}
   const [scores, setScores] = useState({})   // id -> {dim: 1-3}
   const [momentum, setMomentum] = useState({}) // id -> {tag, text}
+  const diffVerify = useVerifyMap()          // `${id}:${dimKey}` -> verify status
 
   const getDiff = (co) => diff[co.id] || deriveDiff(co)
   const getSide = (co) => side[co.id] || deriveSide(co)
@@ -248,7 +250,10 @@ export default function DifferentiationTab({ workspace }) {
           <>
             {/* Where they actually differ */}
             <section className="flex flex-col gap-2">
-              <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-ink-mute">Where they actually differ</span>
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-ink-mute">Where they actually differ</span>
+                <VerifyLegend />
+              </div>
               <div className="bg-white border border-rule rounded-lg overflow-hidden">
                 {DIFF_DIMS.map((dim, di) => (
                   <div key={dim.key} className={`px-4 py-3 ${di < DIFF_DIMS.length - 1 ? 'border-b border-rule' : ''}`}>
@@ -257,15 +262,19 @@ export default function DifferentiationTab({ workspace }) {
                       <span className="font-sans text-[10px] text-ink-mute italic">{dim.caption}</span>
                     </div>
                     <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0,1fr))` }}>
-                      {columns.map(co => (
-                        <div key={co.id} className="min-w-0">
-                          <div className="font-mono text-[8px] uppercase tracking-[0.08em] text-ink-mute mb-1 flex items-center gap-1">
-                            {co.name}{co.focal && <span className="text-accent-deep">·focal</span>}
+                      {columns.map(co => {
+                        const vkey = `${co.id}:${dim.key}`
+                        return (
+                          <div key={co.id} className="min-w-0">
+                            <div className="font-mono text-[8px] uppercase tracking-[0.08em] text-ink-mute mb-1 flex items-center gap-1.5">
+                              <VerifyDot status={diffVerify.get(vkey)} onClick={() => diffVerify.cycle(vkey)} size={7} />
+                              {co.name}{co.focal && <span className="text-accent-deep">·focal</span>}
+                            </div>
+                            <InlineText value={getDiff(co)[dim.key]} onChange={v => setDiffCell(co.id, dim.key, v)} multiline
+                              placeholder="—" className="font-sans text-[12px] text-ink leading-relaxed" />
                           </div>
-                          <InlineText value={getDiff(co)[dim.key]} onChange={v => setDiffCell(co.id, dim.key, v)} multiline
-                            placeholder="—" className="font-sans text-[12px] text-ink leading-relaxed" />
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                     <p className="font-sans text-[9px] text-ink-mute italic mt-2">{DIFF_SOURCE[dim.key]}</p>
                   </div>

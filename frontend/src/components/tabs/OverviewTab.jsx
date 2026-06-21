@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, Zap, ArrowUpRight } from 'lucide-react'
+import { ChevronDown, ChevronUp, ArrowUpRight } from 'lucide-react'
 import { FALLBACK_OVERVIEW } from '../../data/segmentOverview'
 import { VerifyDot, VerifyLegend, useVerifyMap } from '../VerifyDot'
 
@@ -25,44 +25,6 @@ function marketToOverview(workspace) {
 
 function SectionLabel({ children }) {
   return <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-ink-mute">{children}</span>
-}
-
-function SignalCard({ icon: Icon, iconColor, label, items }) {
-  const [openIdx, setOpenIdx] = useState(null)
-  const verify = useVerifyMap()
-  return (
-    <div className="bg-white border border-rule rounded-lg overflow-hidden flex flex-col">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-rule">
-        <Icon size={12} style={{ color: iconColor }} />
-        <span className="font-mono text-[9px] uppercase tracking-[0.13em] text-ink-mute">{label}</span>
-      </div>
-      {items.length === 0 ? (
-        <div className="px-4 py-4 font-sans text-[12px] text-ink-mute italic">None captured yet</div>
-      ) : (
-        <ul className="flex flex-col divide-y divide-rule">
-          {items.map((item, i) => (
-            <li key={i}>
-              <div className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-bg transition-colors">
-                <VerifyDot status={verify.get(i)} onClick={() => verify.cycle(i)} />
-                <button
-                  onClick={() => setOpenIdx(openIdx === i ? null : i)}
-                  className="flex-1 flex items-center justify-between gap-3 text-left bg-transparent border-0 cursor-pointer p-0"
-                >
-                  <span className="font-sans text-[12.5px] text-ink leading-snug flex-1">{item.title}</span>
-                  {openIdx === i ? <ChevronUp size={11} className="text-ink-mute shrink-0" /> : <ChevronDown size={11} className="text-ink-mute shrink-0" />}
-                </button>
-              </div>
-              {openIdx === i && (
-                <div className="px-4 pb-3 pl-[34px]">
-                  <p className="font-sans text-[12px] text-ink-soft leading-relaxed">{item.detail}</p>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
 }
 
 const IMPACT_COLORS = {
@@ -151,56 +113,14 @@ export default function OverviewTab({ workspace }) {
           </div>
         </div>
 
-        {/* ── 3. Structural Signals ── */}
+        {/* ── 3. Regulatory & Policy Radar ── */}
+        {/* Structural Signals / Recent M&A / New Entrants were removed — not
+            verifiable from the available data. Regulatory radar stays. */}
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <SectionLabel>Structural Signals</SectionLabel>
+            <SectionLabel>Regulatory &amp; Policy Radar</SectionLabel>
             <VerifyLegend />
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <SignalCard icon={TrendingUp} iconColor="#2d6a3f" label="Tailwinds" items={d.tailwinds} />
-            <SignalCard icon={TrendingDown} iconColor="#c04a22" label="Headwinds" items={d.headwinds} />
-            <SignalCard icon={Zap} iconColor="#2a5fd4" label="Why Now" items={d.whyNow} />
-          </div>
-
-          {/* Recent M&A + new entrants */}
-          <div className="grid grid-cols-2 gap-3 mt-1">
-            <div className="bg-white border border-rule rounded-lg p-5 flex flex-col gap-3">
-              <span className="font-mono text-[9px] uppercase tracking-[0.13em] text-ink-mute">Recent M&amp;A Activity</span>
-              {d.recentMA.length === 0 ? (
-                <p className="font-sans text-[12px] text-ink-mute italic">None recorded</p>
-              ) : (
-                <ul className="flex flex-col gap-3">
-                  {d.recentMA.map((m, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <span className="font-mono text-[10px] text-ink-mute shrink-0 mt-[2px]">{m.date}</span>
-                      <div>
-                        <div className="font-sans text-[12.5px] font-medium text-ink">{m.event}</div>
-                        <div className="font-sans text-[11.5px] text-ink-soft leading-snug mt-0.5">{m.note}</div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="bg-white border border-rule rounded-lg p-5 flex flex-col gap-3">
-              <span className="font-mono text-[9px] uppercase tracking-[0.13em] text-ink-mute">Notable New Entrants (last 24 months)</span>
-              {d.newEntrants.length === 0 ? (
-                <p className="font-sans text-[12px] text-ink-mute italic">None recorded</p>
-              ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {d.newEntrants.map((e, i) => (
-                    <span key={i} className="font-sans text-[12px] px-3 py-1 rounded-full border" style={{ background: '#f5f2ef', color: '#4a4a4a', borderColor: '#e8e0d4' }}>{e}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ── 4. Regulatory & Policy Radar ── */}
-        <div className="flex flex-col gap-3">
-          <SectionLabel>Regulatory &amp; Policy Radar</SectionLabel>
           <div className="bg-white border border-rule rounded-lg overflow-hidden">
             <div className="grid px-4 py-2 border-b border-rule bg-bg" style={{ gridTemplateColumns: '48px 90px 1fr 72px' }}>
               {['Region', 'Date', 'Development', 'Impact'].map(h => (
@@ -223,6 +143,12 @@ export default function OverviewTab({ workspace }) {
                           <span className="font-sans text-[12.5px] font-medium text-ink">{r.label}</span>
                         </div>
                         <div className="font-sans text-[11.5px] text-ink-soft leading-snug mt-0.5">{r.note}</div>
+                        {(r.source || r.url) && (
+                          <a href={r.url || undefined} target="_blank" rel="noreferrer"
+                            className="font-mono text-[9px] text-accent-deep hover:underline mt-1 inline-block">
+                            source: {(r.source || r.url).replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
+                          </a>
+                        )}
                       </div>
                       <span className="font-mono text-[8.5px] uppercase tracking-[0.06em] px-2 py-0.5 rounded h-fit" style={{ background: ic.bg, color: ic.text }}>{r.impact}</span>
                     </li>
@@ -231,6 +157,9 @@ export default function OverviewTab({ workspace }) {
               </ul>
             )}
           </div>
+          <p className="font-mono text-[8.5px] text-ink-mute italic">
+            AI-estimated — verify against primary regulation (e.g. EUR-Lex, national regulators) before relying on it.
+          </p>
         </div>
 
         {/* ── 5. Customer Adoption Curve ── */}

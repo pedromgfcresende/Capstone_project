@@ -223,7 +223,9 @@ def sector_out(s: Sector, *, with_segments: bool = True, with_companies: bool = 
         "synthesisExtra": s.synthesis_extra or {},
     }
     if with_segments:
-        out["segments"] = [segment_out(seg) for seg in s.segments]
+        # alphabetical everywhere (sidebar, sector table, matrix all read this order)
+        segs_sorted = sorted(s.segments, key=lambda seg: (seg.title or "").lower())
+        out["segments"] = [segment_out(seg) for seg in segs_sorted]
         out["workspaces"] = out["segments"]  # legacy alias (frontend transitioning)
     if with_companies:
         comps = list(s.companies)

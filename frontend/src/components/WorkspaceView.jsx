@@ -99,7 +99,7 @@ export default function WorkspaceView({ workspace, sector, onSectorsChanged }) {
         ) : (
           <>
             {activeTab === 'summary' && (
-              <SynthesisPanel workspaceId={workspace.id} synthesis={synthesis} keyInsight={ws.keyInsight} />
+              <SynthesisPanel workspaceId={workspace.id} synthesis={synthesis} keyInsight={ws.keyInsight} focal={ws.focalCompany} />
             )}
             {activeTab === 'overview' && <OverviewTab workspace={ws} sector={sector} />}
             {activeTab === 'players' && <PlayersTab workspace={ws} sector={sector} onMoved={() => { load(); onSectorsChanged?.() }} />}

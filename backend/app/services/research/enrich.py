@@ -93,7 +93,9 @@ class Suggestion(BaseModel):
 def suggest_sector_segment(*, name: str, description: str | None, industry: str | None) -> Suggestion:
     sys = (
         "You place a company on a VC competitive map. Suggest the market SECTOR and the "
-        "specific competitive SEGMENT it belongs to. Short, title-case labels (no sentences)."
+        "specific competitive SEGMENT it belongs to. Use short Title-Case labels of at most "
+        "5 words — a noun phrase, not a sentence. No trailing qualifier clauses (e.g. say "
+        "'Customer Support AI', not 'Customer support AI agents for regulated finance')."
     )
     human = f"Company: {name}\nDescription: {description or '(n/a)'}\nIndustry: {industry or '(n/a)'}"
     return _invoke(sys, human, Suggestion)

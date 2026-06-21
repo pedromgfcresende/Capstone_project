@@ -8,6 +8,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.db.models import Company, CompanySegment, CrmCompany, Sector, Segment
+from app.services.ingestion.segment_naming import normalize_segment_title
 
 
 def norm(s: str) -> str:
@@ -74,7 +75,7 @@ def persist_competitors(
         db.add(company); db.flush()
         seg = target_segment
         if seg is None:
-            stitle = comp.get("suggested_segment") or "AI-discovered"
+            stitle = normalize_segment_title(comp.get("suggested_segment")) or "AI-discovered"
             seg = seg_by_title.get(norm(stitle))
             if seg is None:
                 seg = Segment(sector_id=sector.id, title=stitle, status="ready")

@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { X, Pencil, Plus, ArrowRight, Mail, CalendarDays, Users, Banknote, BarChart3 } from 'lucide-react'
+import { X, Pencil, ArrowRight, Users, Banknote, BarChart3, Sparkles } from 'lucide-react'
 import { getProfile, METRIC_LEVELS } from '../data/companyProfiles'
+import { VerifyDot, VerifyLegend, useVerifyMap } from './VerifyDot'
+import { patchCompany } from '../api/client'
 
 function InlineText({ value, onChange, multiline = false, placeholder = '—', className = '' }) {
   const [editing, setEditing] = useState(false)
@@ -47,18 +49,53 @@ function Card({ children, className = '' }) {
   return <div className={`bg-white border border-rule rounded-lg ${className}`}>{children}</div>
 }
 
-export default function CompanyProfile({ company, onClose, onEnterSegment }) {
+// Editable + verifiable company fact. Edits persist to the shared company record;
+// the verify dot lets the analyst mark each fact AI-generated / verified / needs-check.
+function Fact({ label, value, onChange, verify, vkey, multiline = false }) {
+  return (
+    <div className="px-5 py-3.5 flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <VerifyDot status={verify.get(vkey)} onClick={() => verify.cycle(vkey)} />
+        <span className="font-mono text-[8.5px] uppercase tracking-[0.12em] text-ink-mute">{label}</span>
+      </div>
+      <div className="pl-[18px]">
+        <InlineText value={value || ''} onChange={onChange} multiline={multiline}
+          placeholder="Click to add…" className="font-sans text-[13px] text-ink leading-relaxed" />
+      </div>
+    </div>
+  )
+}
+
+export default function CompanyProfile({ company, onClose, onEnterSegment, onSaved }) {
   const base = getProfile(company)
-  const [contacts, setContacts] = useState(base.contacts.map(c => ({ ...c })))
-  const [meetings, setMeetings] = useState(base.meetings.map(m => ({ ...m })))
+  const verify = useVerifyMap()
+  const [saveMsg, setSaveMsg] = useState('')
+  // editable core facts, seeded from the company; funding_status maps from the raw round
+  const [form, setForm] = useState({
+    founded: company.founded || '',
+    geography: company.geography || company.location || '',
+    funding_status: company.roundRaw || company.fundRound || '',
+    funding_amount: company.fundingAmount || '',
+    top_investors: company.topInvestors || '',
+    primary_customer: company.primaryCustomer || '',
+    description: company.description || '',
+  })
 
-  const updateContact = (id, patch) => setContacts(p => p.map(c => c.id === id ? { ...c, ...patch } : c))
-  const removeContact = (id) => setContacts(p => p.filter(c => c.id !== id))
-  const addContact = () => setContacts(p => [...p, { id: `k-${Date.now()}`, name: '', role: '', email: '', note: '' }])
+  const saveField = async (field, value) => {
+    setForm(f => ({ ...f, [field]: value }))
+    try {
+      await patchCompany(company.id, { [field]: value })
+      setSaveMsg('Saved ✓')
+      onSaved?.()
+    } catch (e) {
+      setSaveMsg(`Save failed: ${e.message}`)
+    }
+  }
 
-  const updateMeeting = (id, patch) => setMeetings(p => p.map(m => m.id === id ? { ...m, ...patch } : m))
-  const removeMeeting = (id) => setMeetings(p => p.filter(m => m.id !== id))
-  const addMeeting = () => setMeetings(p => [{ id: `m-${Date.now()}`, date: new Date().toISOString().slice(0, 10), time: '', title: '', attendees: '', notes: '' }, ...p])
+  const extra = company.extra || {}
+  const aiWhy = company.why || extra.why
+  const aiSources = company.sources || extra.sources || []
+  const aiConfidence = company.confidence ?? extra.confidence
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
@@ -70,8 +107,9 @@ export default function CompanyProfile({ company, onClose, onEnterSegment }) {
 
         {/* Top bar */}
         <div className="flex items-center justify-between px-6 py-3.5 border-b border-rule bg-bg-card shrink-0">
-          <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-ink-mute">Company · Relationship</span>
+          <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-ink-mute">Company · Profile</span>
           <div className="flex items-center gap-2">
+            {saveMsg && <span className="font-mono text-[9px] text-ink-mute">{saveMsg}</span>}
             {onEnterSegment && company.workspaceId && (
               <button onClick={onEnterSegment}
                 className="flex items-center gap-1.5 font-sans text-[11.5px] font-medium px-3 py-1.5 rounded-md border border-rule bg-white text-ink-soft hover:text-ink hover:border-ink-mute cursor-pointer transition-all">
@@ -93,96 +131,71 @@ export default function CompanyProfile({ company, onClose, onEnterSegment }) {
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <h2 className="font-serif text-[24px] font-semibold text-ink tracking-tight">{company.name}</h2>
                   {company.focal && <span className="font-mono text-[8px] uppercase tracking-[0.06em] text-accent-deep bg-accent-soft px-2 py-1 rounded-full border border-accent-soft">focal</span>}
+                  {company.origin === 'ai' && <span className="font-mono text-[8px] uppercase tracking-[0.06em] px-2 py-1 rounded-full" style={{ background: '#e8e0f8', color: '#5a3d9a' }}>AI-found</span>}
                 </div>
                 <span className="font-sans text-[12.5px] text-ink-soft">
-                  {[company.geography, company.founded && `Founded ${company.founded}`].filter(Boolean).join(' · ')}
+                  {[form.geography, form.founded && `Founded ${form.founded}`, company.segment].filter(Boolean).join(' · ')}
                 </span>
               </div>
               <div className="flex flex-col items-end gap-2 shrink-0">
                 {company.fundRound && <span className="font-mono text-[10px] text-ink-soft bg-bg px-2.5 py-1 rounded-full border border-rule">{company.fundRound}</span>}
-                {base.totalRaised && (
+                {(base.totalRaised || company.raised) && (
                   <div className="flex flex-col items-end mt-1">
-                    <span className="font-serif text-[22px] font-semibold text-ink leading-none">{base.totalRaised}</span>
-                    <span className="font-sans text-[10.5px] text-ink-mute mt-1">total raised</span>
+                    <span className="font-serif text-[22px] font-semibold text-ink leading-none">{base.totalRaised || company.raised}</span>
+                    <span className="font-sans text-[10.5px] text-ink-mute mt-1">{base.totalRaised ? 'total raised' : 'raised'}</span>
                   </div>
                 )}
               </div>
             </div>
           </Card>
 
-          {/* ── Contacts (relationship focus) ── */}
+          {/* ── Key facts (editable + verifiable) ── */}
           <div>
-            <SectionLabel icon={Users} action={
-              <button onClick={addContact} className="flex items-center gap-1 font-mono text-[8.5px] uppercase tracking-[0.08em] text-ink-mute hover:text-ink bg-transparent border-0 cursor-pointer transition-colors">
-                <Plus size={10} /> Add
-              </button>
-            }>Contacts</SectionLabel>
+            <SectionLabel icon={Pencil} action={<VerifyLegend />}>Key facts · editable</SectionLabel>
             <Card className="overflow-hidden divide-y divide-rule">
-              {contacts.length === 0 && (
-                <div className="px-4 py-5 font-sans text-[12.5px] text-ink-mute italic text-center">No contacts yet — click Add.</div>
-              )}
-              {contacts.map(c => (
-                <div key={c.id} className="px-4 py-3.5 group flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className="min-w-[120px]">
-                      <InlineText value={c.name} onChange={v => updateContact(c.id, { name: v })} placeholder="Name" className="font-sans text-[13px] font-semibold text-ink" />
-                    </div>
-                    <span className="text-ink-mute">·</span>
-                    <div className="flex-1 min-w-0">
-                      <InlineText value={c.role} onChange={v => updateContact(c.id, { role: v })} placeholder="Role" className="font-sans text-[11.5px] text-ink-soft" />
-                    </div>
-                    <button onClick={() => removeContact(c.id)} className="shrink-0 text-ink-mute hover:text-red-500 bg-transparent border-0 cursor-pointer opacity-0 group-hover:opacity-100 transition-all p-0.5">
-                      <X size={11} />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Mail size={10} className="text-ink-mute shrink-0" />
-                    <InlineText value={c.email} onChange={v => updateContact(c.id, { email: v })} placeholder="email…" className="font-mono text-[10.5px] text-ink-soft" />
-                  </div>
-                  <InlineText value={c.note} onChange={v => updateContact(c.id, { note: v })} placeholder="Relationship note…" className="font-sans text-[11.5px] text-ink-mute italic leading-relaxed" />
-                </div>
-              ))}
+              <div className="grid grid-cols-2 divide-x divide-rule">
+                <Fact label="Year founded" value={form.founded} verify={verify} vkey="founded" onChange={v => saveField('founded', v)} />
+                <Fact label="Location" value={form.geography} verify={verify} vkey="geography" onChange={v => saveField('geography', v)} />
+              </div>
+              <div className="grid grid-cols-2 divide-x divide-rule">
+                <Fact label="Funding stage" value={form.funding_status} verify={verify} vkey="funding_status" onChange={v => saveField('funding_status', v)} />
+                <Fact label="Funding amount" value={form.funding_amount} verify={verify} vkey="funding_amount" onChange={v => saveField('funding_amount', v)} />
+              </div>
+              <Fact label="Top investors" value={form.top_investors} verify={verify} vkey="top_investors" onChange={v => saveField('top_investors', v)} />
+              <Fact label="Primary customer" value={form.primary_customer} verify={verify} vkey="primary_customer" onChange={v => saveField('primary_customer', v)} />
+              <Fact label="Description" value={form.description} verify={verify} vkey="description" multiline onChange={v => saveField('description', v)} />
             </Card>
           </div>
 
-          {/* ── Meeting notes history (relationship focus) ── */}
-          <div>
-            <SectionLabel icon={CalendarDays} action={
-              <button onClick={addMeeting} className="flex items-center gap-1 font-mono text-[8.5px] uppercase tracking-[0.08em] text-ink-mute hover:text-ink bg-transparent border-0 cursor-pointer transition-colors">
-                <Plus size={10} /> Log meeting
-              </button>
-            }>Meeting notes</SectionLabel>
-            <div className="flex flex-col gap-2.5">
-              {meetings.length === 0 && (
-                <Card className="px-4 py-5"><div className="font-sans text-[12.5px] text-ink-mute italic text-center">No meetings logged yet — click Log meeting.</div></Card>
-              )}
-              {meetings.map(m => (
-                <Card key={m.id} className="p-4 group">
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <input type="date" value={m.date || ''} onChange={e => updateMeeting(m.id, { date: e.target.value })}
-                      className="font-mono text-[10.5px] text-ink-soft bg-bg border border-rule rounded px-1.5 py-1 outline-none focus:border-ink-mute cursor-pointer shrink-0" />
-                    <input type="time" value={m.time || ''} onChange={e => updateMeeting(m.id, { time: e.target.value })}
-                      className="font-mono text-[10.5px] text-ink-soft bg-bg border border-rule rounded px-1.5 py-1 outline-none focus:border-ink-mute cursor-pointer shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <InlineText value={m.title} onChange={v => updateMeeting(m.id, { title: v })} placeholder="Meeting title" className="font-sans text-[13px] font-semibold text-ink" />
-                    </div>
-                    <button onClick={() => removeMeeting(m.id)} className="shrink-0 text-ink-mute hover:text-red-500 bg-transparent border-0 cursor-pointer opacity-0 group-hover:opacity-100 transition-all p-0.5">
-                      <X size={11} />
-                    </button>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <InlineText value={m.attendees} onChange={v => updateMeeting(m.id, { attendees: v })} placeholder="Attendees…" className="font-sans text-[11px] text-ink-soft" />
-                    <InlineText value={m.notes} onChange={v => updateMeeting(m.id, { notes: v })} multiline placeholder="What was discussed…" className="font-sans text-[12px] text-ink leading-relaxed" />
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Funding ── */}
-          {(base.latestRound || base.fundingHistory.length > 0) && (
+          {/* ── AI provenance (for AI-discovered competitors) ── */}
+          {(aiWhy || aiSources.length > 0) && (
             <div>
-              <SectionLabel icon={Banknote}>Funding</SectionLabel>
+              <SectionLabel icon={Sparkles}>Why it's a competitor · AI</SectionLabel>
+              <Card className="p-5 flex flex-col gap-3">
+                {aiWhy && <p className="font-sans text-[12.5px] text-ink leading-relaxed">{aiWhy}</p>}
+                {aiConfidence != null && <span className="font-mono text-[9px] text-ink-mute">confidence {Math.round(aiConfidence * 100)}%</span>}
+                {aiSources.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-[8px] uppercase tracking-[0.08em] text-ink-mute">sources</span>
+                    {aiSources.slice(0, 6).map((s, i) => {
+                      const u = typeof s === 'string' ? s : (s?.url || '')
+                      if (!u) return null
+                      return (
+                        <a key={i} href={u} target="_blank" rel="noreferrer" className="font-mono text-[9px] text-accent-deep hover:underline truncate max-w-[160px]">
+                          {u.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
+                        </a>
+                      )
+                    })}
+                  </div>
+                )}
+              </Card>
+            </div>
+          )}
+
+          {/* ── Funding (research context, when available) ── */}
+          {(base.latestRound || base.fundingHistory.length > 0 || base.investors.length > 0) && (
+            <div>
+              <SectionLabel icon={Banknote}>Funding history</SectionLabel>
               <Card className="overflow-hidden">
                 {base.latestRound && (
                   <div className="px-5 py-4 border-b border-rule">

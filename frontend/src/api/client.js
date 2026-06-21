@@ -37,6 +37,7 @@ export const deleteSector = (id) => send('DELETE', `/sectors/${id}`)
 export const collectSegmentSources = (id) => send('POST', `/segments/${id}/collect-sources`)
 export const moveCompanySegment = (companyId, fromSegmentId, toSegmentId) =>
   send('POST', `/companies/${companyId}/move-segment`, { fromSegmentId, toSegmentId })
+export const patchCompany = (companyId, body) => send('PATCH', `/companies/${companyId}`, body)
 
 export const getCrmFacets = () => get('/crm/facets')
 export const analyseCrmCompany = (id) => send('POST', `/crm/companies/${id}/analyse`)

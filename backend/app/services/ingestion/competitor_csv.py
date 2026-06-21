@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Company, CompanySegment, Sector, Segment, Upload
 from app.services.ingestion.common import build_extra, clean, to_int
+from app.services.ingestion.segment_naming import normalize_segment_title
 
 # company-level CSV column -> model field
 COMPANY_MAP = {
@@ -101,10 +102,11 @@ def ingest_competitor_df(
                 companies[ckey] = company
 
             for sname in _segments_in_row(raw):
-                skey = _norm(sname)
+                stitle = normalize_segment_title(sname) or sname
+                skey = _norm(stitle)
                 segment = segments.get(skey)
                 if segment is None:
-                    segment = Segment(sector_id=sector.id, title=sname, status="ready")
+                    segment = Segment(sector_id=sector.id, title=stitle, status="ready")
                     db.add(segment)
                     db.flush()
                     segments[skey] = segment

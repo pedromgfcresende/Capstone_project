@@ -44,6 +44,54 @@ def _append_source(extra: dict, field: str, collected: dict) -> None:
     extra["sources"] = srcs
 
 
+class CompanyPatch(BaseModel):
+    """Analyst edits to a company's core facts (year founded, location, etc.).
+
+    Edits the shared company record — applies across every segment the company
+    competes in. Per-segment facts (tier/focal/notes) are not touched here.
+    """
+
+    name: str | None = None
+    founded: str | None = None
+    geography: str | None = None
+    funding_status: str | None = None
+    funding_amount: str | None = None
+    top_investors: str | None = None
+    description: str | None = None
+    primary_customer: str | None = None
+
+
+_COMPANY_EDITABLE = (
+    "name", "founded", "geography", "funding_status", "funding_amount",
+    "top_investors", "description", "primary_customer",
+)
+
+
+@router.patch("/companies/{company_id}")
+def patch_company(company_id: uuid.UUID, payload: CompanyPatch, db: Session = Depends(get_db)) -> dict:
+    """Update a company's analyst-editable core fields."""
+    company = db.get(Company, company_id)
+    if company is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+    data = payload.model_dump(exclude_unset=True)
+    for field in _COMPANY_EDITABLE:
+        if field in data and data[field] is not None:
+            setattr(company, field, data[field])
+    db.commit()
+    db.refresh(company)
+    return {
+        "id": str(company.id),
+        "name": company.name,
+        "founded": company.founded,
+        "geography": company.geography,
+        "fundingStatus": company.funding_status,
+        "fundingAmount": company.funding_amount,
+        "topInvestors": company.top_investors,
+        "description": company.description,
+        "primaryCustomer": company.primary_customer,
+    }
+
+
 class MoveSegmentIn(BaseModel):
     fromSegmentId: uuid.UUID
     toSegmentId: uuid.UUID

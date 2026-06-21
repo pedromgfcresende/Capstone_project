@@ -69,7 +69,7 @@ function consolidateSegments(rows) {
     const label = ordered.length ? ordered.map(titleCase).join(' ') : groupRows[0].title
     return { label, rows: groupRows }
   })
-  return groups.sort((a, b) => b.rows.length - a.rows.length)
+  return groups.sort((a, b) => a.label.localeCompare(b.label))
 }
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
 const parseDate = (s) => {
@@ -227,7 +227,7 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDele
         companies: (ws.companies || []).length,
         tam: ov.tam, cagr: ov.cagr, stage: ov.adoptionStage || ov.maturity,
       }
-    }).sort((a, b) => parseTam(b.tam) - parseTam(a.tam)),
+    }).sort((a, b) => a.title.localeCompare(b.title)),
     [workspaces]
   )
 
@@ -621,22 +621,20 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDele
                 </div>
               ) : (
                 <div className="bg-white border border-rule rounded-lg overflow-hidden">
-                  <div className="grid items-center px-4 py-2 border-b border-rule bg-bg" style={{ gridTemplateColumns: '1fr 130px 70px 80px 150px 110px' }}>
-                    {['Segment', 'Stage', 'Cos', 'TAM', 'CAGR', ''].map((h, i) => (
+                  <div className="grid items-center px-4 py-2 border-b border-rule bg-bg" style={{ gridTemplateColumns: '1fr 70px 80px 150px 110px' }}>
+                    {['Segment', 'Cos', 'TAM', 'CAGR', ''].map((h, i) => (
                       <span key={i} className="font-mono text-[8.5px] uppercase tracking-[0.1em] text-ink-mute">{h}</span>
                     ))}
                   </div>
                   {(groupSegs ? consolidatedGroups : segmentRows).map(row => {
-                    const m = MOMENTUM[row.stage] || { label: row.stage || '—', bg: '#f0ede8', text: '#8a8580' }
                     return (
-                      <div key={row.id} className="grid items-center px-4 py-3.5 border-b border-rule last:border-b-0 hover:bg-bg transition-colors" style={{ gridTemplateColumns: '1fr 130px 70px 80px 150px 110px' }}>
+                      <div key={row.id} className="grid items-center px-4 py-3.5 border-b border-rule last:border-b-0 hover:bg-bg transition-colors" style={{ gridTemplateColumns: '1fr 70px 80px 150px 110px' }}>
                         <div className="flex flex-col gap-0.5 min-w-0 pr-3">
                           <span className="font-sans text-[13px] font-semibold text-ink truncate">{row.title}</span>
                           {row.merged
                             ? <span className="font-sans text-[10.5px] text-ink-mute truncate" title={row.merged.join(' · ')}>Merged · {row.merged.join(' · ')}</span>
                             : row.focal && <span className="font-sans text-[11px] text-ink-mute truncate">Focal · {row.focal}</span>}
                         </div>
-                        <span className="font-mono text-[9px] uppercase tracking-[0.05em] px-2 py-0.5 rounded w-fit" style={{ background: m.bg, color: m.text }}>{m.label}</span>
                         <span className="font-sans text-[12.5px] text-ink-soft">{row.companies}</span>
                         <span className="font-sans text-[13px] font-semibold text-ink">{row.tam || '—'}</span>
                         <span className="font-mono text-[11px] text-ink-soft">{row.cagr || '—'}</span>
@@ -671,14 +669,22 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDele
                   ) : (
                     <div className="mb-3 font-sans text-[11.5px] text-ink-mute">Each company maps to a single segment in this upload.</div>
                   )}
+                  {/* legend up top — easier to read the grid without scrolling to the bottom */}
+                  <div className="mb-2 font-mono text-[8px] uppercase tracking-[0.08em] text-ink-mute">★ focal · number = competitive tier (1 = most serious) · • present</div>
                   <div className="bg-white border border-rule rounded-lg overflow-x-auto">
                     <table className="border-collapse w-full">
                       <thead>
                         <tr className="border-b border-rule">
-                          <th className="text-left font-mono text-[8.5px] uppercase tracking-[0.1em] text-ink-mute px-3 py-2 sticky left-0 bg-white z-10">Company</th>
+                          <th className="text-left font-mono text-[8.5px] uppercase tracking-[0.1em] text-ink-mute px-3 align-bottom sticky left-0 bg-white z-10" style={{ height: 124 }}>Company</th>
                           {segs.map(s => (
-                            <th key={s.id} className="font-mono text-[8px] uppercase tracking-[0.05em] text-ink-mute px-2 py-2 align-bottom" style={{ minWidth: 46 }}>
-                              <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }} className="whitespace-nowrap mx-auto">{s.title}</div>
+                            <th key={s.id} className="font-mono text-[8.5px] uppercase tracking-[0.05em] text-ink-mute px-0 align-bottom" style={{ minWidth: 30, height: 124 }}>
+                              {/* diagonal labels read more naturally than fully-vertical text */}
+                              <div className="relative h-full w-full">
+                                <div
+                                  className="absolute bottom-1.5 left-1/2 whitespace-nowrap origin-bottom-left"
+                                  style={{ transform: 'rotate(-45deg)' }}
+                                >{s.title}</div>
+                              </div>
                             </th>
                           ))}
                         </tr>
@@ -709,7 +715,6 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDele
                       </tbody>
                     </table>
                   </div>
-                  <div className="mt-2 font-mono text-[8px] uppercase tracking-[0.08em] text-ink-mute">★ focal · number = competitive tier (1 = most serious) · • present</div>
                 </div>
               )
             })()}
@@ -823,7 +828,7 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDele
                 <input
                   type="text" value={aiQuery} onChange={e => setAiQuery(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') handleAiQuery() }}
-                  placeholder={workspaces.length === 0 ? 'Add segments to start querying…' : 'Ask anything — e.g. "Which segment has the strongest enterprise traction?"'}
+                  placeholder={workspaces.length === 0 ? 'Add segments to start querying…' : 'Ask anything — e.g. "Which segment looks most competitive, and why?"'}
                   disabled={workspaces.length === 0 || thinking}
                   className="flex-1 bg-transparent border-0 outline-none font-sans text-[13px] text-ink placeholder:text-ink-mute disabled:opacity-50"
                 />

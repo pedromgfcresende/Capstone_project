@@ -1,5 +1,9 @@
 # Feedback Build Plan — Capstone Review Round
 
+> **Status: IMPLEMENTED** (all work packages WP0–WP4). Frontend builds clean,
+> backend 42/42 tests pass, segment-name backfill run against the live DB
+> (23 renamed, 1 merged). See the commit for the diff.
+
 Sequenced plan to incorporate the latest reviewer feedback. Scoped against the
 current codebase (file:line references are exact as of this writing). Bias toward
 a working demo; items are ordered by impact-to-effort.

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
-import { ChevronRight, ChevronDown, Sparkles } from 'lucide-react'
-import { moveCompanySegment } from '../../api/client'
+import { ChevronRight, ChevronDown, Sparkles, RefreshCw } from 'lucide-react'
+import { moveCompanySegment, enrichSector } from '../../api/client'
+import CompanyProfile from '../CompanyProfile'
 
 // ── Players Overview ──────────────────────────────────────────────────────────
 // A clean, signal-first table. No black-box priority score (removed by design —
@@ -66,7 +67,7 @@ function RoundBadge({ value }) {
   )
 }
 
-function PlayerRow({ player, showType, colTemplate, onCycleType, onDescribe, otherSegments, onMove }) {
+function PlayerRow({ player, showType, colTemplate, onCycleType, onDescribe, otherSegments, onMove, onOpenCard }) {
   const [expanded, setExpanded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [moving, setMoving] = useState(false)
@@ -89,7 +90,13 @@ function PlayerRow({ player, showType, colTemplate, onCycleType, onDescribe, oth
         <span className="text-ink-mute">{expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}</span>
 
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-sans text-[13px] font-medium text-ink truncate">{player.name}</span>
+          <button
+            onClick={e => { e.stopPropagation(); onOpenCard(player) }}
+            title="Open company card"
+            className="font-sans text-[13px] font-medium text-ink truncate bg-transparent border-0 p-0 cursor-pointer hover:text-accent transition-colors text-left"
+          >
+            {player.name}
+          </button>
           {player.focal && (
             <span className="font-mono text-[8px] bg-accent-soft text-accent-deep px-1.5 py-0.5 rounded uppercase tracking-[0.05em] border border-accent-soft shrink-0">focal</span>
           )}
@@ -156,6 +163,24 @@ export default function PlayersTab({ workspace, sector, onMoved }) {
 
   const [overrides, setOverrides] = useState({})  // id -> { relationType?, description? }
   const [sortId, setSortId] = useState('round')
+  const [profileCompany, setProfileCompany] = useState(null)
+  const [enriching, setEnriching] = useState(false)
+  const [enrichMsg, setEnrichMsg] = useState('')
+
+  const findCompetitors = async () => {
+    if (!sector?.id) return
+    setEnriching(true); setEnrichMsg('')
+    try {
+      const r = await enrichSector(sector.id, { segmentId: workspace.id })
+      const n = r?.enrichment?.createdCount ?? 0
+      setEnrichMsg(`+${n} AI-found competitor${n === 1 ? '' : 's'}`)
+      onMoved?.()  // reload segment + sector so new competitors show
+    } catch (e) {
+      setEnrichMsg(`Failed: ${e.message}`)
+    } finally {
+      setEnriching(false)
+    }
+  }
 
   const otherSegments = (sector?.segments || sector?.workspaces || [])
     .filter(s => s.id !== workspace.id)
@@ -224,9 +249,23 @@ export default function PlayersTab({ workspace, sector, onMoved }) {
             ))}
           </div>
         </div>
-        <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">
-          {sorted.length} companies · {searchPath} search
-        </span>
+        <div className="flex items-center gap-3">
+          {enrichMsg && <span className="font-mono text-[9px] text-ink-mute">{enrichMsg}</span>}
+          <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-mute">
+            {sorted.length} companies · {searchPath} search
+          </span>
+          <button
+            onClick={findCompetitors}
+            disabled={enriching || !sector?.id}
+            title="AI market research — find competitors for this segment (web + LLM)"
+            className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.1em] px-3 py-1.5 rounded transition-all cursor-pointer disabled:opacity-50 border-0"
+            style={{ background: enriching ? '#d8d2c5' : '#15063b', color: enriching ? '#8a8580' : '#fff' }}
+            onMouseEnter={e => { if (!enriching) e.currentTarget.style.background = '#6a5cd6' }}
+            onMouseLeave={e => { if (!enriching) e.currentTarget.style.background = '#15063b' }}
+          >
+            {enriching ? <><RefreshCw size={11} className="animate-spin" /> Researching…</> : <><Sparkles size={11} /> Find competitors</>}
+          </button>
+        </div>
       </div>
 
       {/* Header */}
@@ -259,10 +298,19 @@ export default function PlayersTab({ workspace, sector, onMoved }) {
               onDescribe={describe}
               otherSegments={otherSegments}
               onMove={moveCompany}
+              onOpenCard={setProfileCompany}
             />
           ))
         )}
       </div>
+
+      {profileCompany && (
+        <CompanyProfile
+          company={{ ...profileCompany, workspaceId: workspace.id }}
+          onClose={() => setProfileCompany(null)}
+          onSaved={() => onMoved?.()}
+        />
+      )}
     </div>
   )
 }
