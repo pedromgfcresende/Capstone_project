@@ -36,7 +36,7 @@ TABLES = {
                       "segment_id  ·  uuid", "status  ·  pending|done|failed", "query_plan  ·  jsonb",
                       "result  ·  jsonb  (competitors + sources)", "model / error"],
     "crm_companies": ["id  ·  uuid  PK", "affinity_row_id / organization_id", "name / website",
-                      "lead_status  ·  hot|pass|unknown", "affinity_status / owner / tag", "investors / investment_stage",
+                      "lead_status  ·  text", "affinity_status / owner / tag", "investors / investment_stage",
                       "country / industry_xange", "description  ·  text", "year_founded  ·  int",
                       "total_funding_usd / _eur  ·  float", "linkedin_url / dealroom_url",
                       "last_email / last_meeting / next_meeting", "employees_current  ·  int", "extra  ·  jsonb"],

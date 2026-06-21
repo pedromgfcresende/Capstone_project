@@ -143,7 +143,7 @@ chip(1.5, 15.45, 4.05, 1.25, "competitor_csv.py",
      "Builds a Sector + Segments.\nList-valued Segment column → N:N\ncompany_segments. Focal = untiered row.",
      INGEST_HDR)
 chip(5.7, 15.45, 4.1, 1.25, "crm_csv.py",
-     "Affinity export (Hot / Pass / Unknown).\n~90 sparse cols → typed core +\nextra JSONB.  825 rows seeded.",
+     "Affinity CRM extraction.\n~90 sparse cols → typed core +\nextra JSONB.",
      INGEST_HDR)
 
 varrow(FCX, 15.2, 14.9)
@@ -253,7 +253,7 @@ exts = [
     ("Tavily", "web search API\n(grounded snippets)", "#1f9e8f"),
     ("Target websites", "trafilatura + headless\nPlaywright (Chromium)", "#3b7bd0"),
     ("Open-data APIs", "FR/UK/DE registries · World\nBank · Eurostat · SEC EDGAR", "#1f9e8f"),
-    ("Affinity CRM export", "3 CSVs (Hot/Pass/Unknown)\n→ pipeline view", DB_HDR),
+    ("Affinity CRM export", "CRM extraction CSV\n→ pipeline view", DB_HDR),
 ]
 cw = 2.7
 for i, (t, b, acc) in enumerate(exts):

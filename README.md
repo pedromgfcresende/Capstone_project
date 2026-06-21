@@ -69,24 +69,20 @@ curl -X POST http://localhost:8000/api/uploads/competitor \
 Re-uploading with the same `sector_label` **extends** that sector (adds new
 segments/companies). One competitor CSV = one sector.
 
-### 2. CRM export CSV(s) → updates the **Deal Pipeline**
+### 2. CRM extraction CSV → updates the **Deal Pipeline**
 
-XAnge's Affinity export (the Hot / Pass / Unknown lead lists) feeds the
-cross-cutting pipeline view — **separate** from the competitor data in v1.
+XAnge's Affinity CRM extraction feeds the cross-cutting pipeline view —
+**separate** from the competitor data in v1.
 
-- Upload **one or more** CSVs at once; they're concatenated.
-- `lead_status` (hot / pass / unknown) is inferred from each file's name.
+- Upload the CRM extraction CSV.
 - ~90 sparse Affinity columns → typed core + JSONB `extra`.
 
 ```bash
 curl -X POST http://localhost:8000/api/uploads/crm \
-  -F "files=@'Hot Leads ... export.csv'" \
-  -F "files=@'Pass Leads ... export.csv'" \
-  -F "files=@'Unknown Leads ... export.csv'"
+  -F "files=@crm_extraction.csv"
 ```
 
-Re-uploading **adds to / refreshes** the pipeline. (The bundled `scripts.seed`
-does exactly this for the three sample exports.)
+Re-uploading **adds to / refreshes** the pipeline.
 
 ### What happens after ingestion
 
@@ -230,7 +226,7 @@ The live catalogue is served at `GET /api/sources`.
 | POST | `/api/sectors/{id}/market-context` | World Bank + Eurostat macro pull |
 | GET / PATCH | `/api/segments/{id}` | segment detail / edit |
 | POST | `/api/segments/{id}/synthesize` | AI segment synthesis |
-| GET | `/api/crm/companies?status=hot&q=...` | CRM pipeline (filtered, paginated) |
+| GET | `/api/crm/companies?q=...&country=...` | CRM pipeline (filtered, paginated) |
 | POST | `/api/crm/companies/{id}/analyse` | company-first AI analysis |
 | PATCH | `/api/companies/{id}` | edit a company's core facts |
 | POST | `/api/companies/{id}/collect-registry` | registry lookup (FR/UK/DE) |
@@ -273,4 +269,4 @@ cd backend && uv run python scripts/make_architecture_png.py
    - **Sources**: the claims as a verifiable evidence register.
 4. **Find competitors** → AI discovers non-CRM players with source provenance.
 5. **Ask across segments** → grounded Q&A with citations; **Save** analyst edits.
-6. **Deal Pipeline** → browse the CRM companies; filter by status, country, search.
+6. **Deal Pipeline** → browse the CRM companies; filter by country and search.
