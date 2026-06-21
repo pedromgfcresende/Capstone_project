@@ -45,8 +45,10 @@ SOURCE_DIRECTORY: list[dict] = [
         "access": FULLY,
         "dataType": "Official German registry (HTML)",
         "reliability": "High (slow)",
-        "live": False,
-        "notes": "Publicly readable; no clean API — manual reference only.",
+        "collector": "registry_de",
+        "live": True,
+        "notes": "Official portal is JSF/anti-bot — scraped via OffeneRegister "
+                 "(Handelsregister open-data mirror) with a Wikidata fallback.",
     },
     # ── market context (collectors) ───────────────────────────────────────────
     {
@@ -67,8 +69,9 @@ SOURCE_DIRECTORY: list[dict] = [
         "access": FULLY,
         "dataType": "EU structured tables + CSV",
         "reliability": "High",
-        "live": False,
-        "notes": "Population, business demography (SDMX API) — manual reference for now.",
+        "collector": "eurostat",
+        "live": True,
+        "notes": "Keyless JSON-stat API. Population + GDP per country (EU-authoritative market context).",
     },
     {
         "section": "Market · Funding signals",

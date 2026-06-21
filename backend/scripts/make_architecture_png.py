@@ -121,7 +121,7 @@ ax.text(0.9, 20.32,
         "Sidebar nav tree  ·  Sector canvas (Company × Segment matrix, thesis, watchlist, “Ask across segments” Q&A)",
         fontsize=9.3, color=SOFT, va="top", ha="left", family="sans-serif")
 ax.text(0.9, 20.0,
-        "Segment tabs: AI Analysis · Market Overview · Players · Comparative · Differentiation · Sources   |   CRM pipeline   |   VerifyDot trust dots",
+        "Segment tabs: AI Analysis · Market Overview · Players · Differentiation · Sources   |   CRM pipeline   |   VerifyDot trust dots",
         fontsize=9.3, color=SOFT, va="top", ha="left", family="sans-serif")
 
 varrow(8.0, 19.25, 18.7, label="  HTTP · REST / JSON · API :8000", lx=0.0)
@@ -190,6 +190,13 @@ for ax1 in (4.05, 6.7):
 ax.text(1.6, 7.45,
         "Entry points:  POST /sectors/{id}/enrich   ·   POST /crm/companies/{id}/analyse  (company-first: LLM suggests sector + segment, then researches)",
         fontsize=7.7, color=SOFT, va="top", ha="left", family="monospace")
+ax.plot([1.5, 9.75], [6.95, 6.95], color="#e2dccf", lw=1.0, zorder=4)
+ax.text(1.6, 6.78,
+        "OPEN-DATA COLLECTORS · M4  (keyless, best-effort, source-tagged)",
+        fontsize=8.0, color=ENRICH_HDR, va="top", ha="left", family="monospace", fontweight="bold")
+ax.text(1.6, 6.5,
+        "FR/UK/DE registries · World Bank · Eurostat · SEC EDGAR  →  company.extra (founded/HQ) + sector market context",
+        fontsize=7.6, color=SOFT, va="top", ha="left", family="monospace")
 
 varrow(FCX, 6.3, 6.0)
 
@@ -206,7 +213,7 @@ ax.text(1.6, 5.08,
 # ── POSTGRESQL container ─────────────────────────────────────────────────────
 DX, DW = 11.6, 3.6
 panel(DX, 4.35, DW, 13.45, DB_FC, DB_HDR, lw=1.5)
-pill(DX + 0.3, 17.55, "POSTGRESQL 17  ·  :5544", DB_HDR, fs=10)
+pill(DX + 0.3, 17.55, "POSTGRESQL 16  ·  :5544", DB_HDR, fs=10)
 ax.text(DX + DW / 2, 17.0, "SQLAlchemy 2.0  ·  Alembic", fontsize=8.4, color=DB_HDR,
         ha="center", family="monospace", fontweight="bold")
 tables = [
@@ -243,14 +250,15 @@ panel(0.5, 1.0, 15.0, 2.35, EXT_FC, EXT_HDR, lw=1.5)
 pill(0.85, 3.1, "EXTERNAL SERVICES", EXT_HDR)
 exts = [
     ("Anthropic / OpenAI", "LLM — all synthesis, Q&A,\nenrichment reasoning", SYNTH_HDR),
-    ("Tavily", "web search API\n(grounded result snippets)", "#1f9e8f"),
-    ("Target websites", "trafilatura + headless\nPlaywright (Chromium) scrape", "#3b7bd0"),
+    ("Tavily", "web search API\n(grounded snippets)", "#1f9e8f"),
+    ("Target websites", "trafilatura + headless\nPlaywright (Chromium)", "#3b7bd0"),
+    ("Open-data APIs", "FR/UK/DE registries · World\nBank · Eurostat · SEC EDGAR", "#1f9e8f"),
     ("Affinity CRM export", "3 CSVs (Hot/Pass/Unknown)\n→ pipeline view", DB_HDR),
 ]
-cw = 3.55
+cw = 2.7
 for i, (t, b, acc) in enumerate(exts):
-    cx = 0.85 + i * 3.7
-    chip(cx, 1.25, cw, 1.45, t, b, acc, fs_t=10, fs_b=8.2)
+    cx = 0.85 + i * 2.92
+    chip(cx, 1.25, cw, 1.45, t, b, acc, fs_t=9.2, fs_b=7.6)
 
 fig.savefig("architecture.png", facecolor=BG, bbox_inches="tight", pad_inches=0.35)
 print("wrote architecture.png")

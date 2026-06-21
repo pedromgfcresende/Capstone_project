@@ -19,9 +19,11 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.db.models import Company, CompanySegment, Sector, Segment
 from app.db.session import get_db
 from app.services.axes import parse_year
+from app.services.collect.edgar import edgar_filing_mentions
+from app.services.collect.eurostat import country_market_context as eurostat_context
 from app.services.collect.registries import lookup_company_registry
 from app.services.collect.sources import SOURCE_DIRECTORY
-from app.services.collect.worldbank import country_market_context
+from app.services.collect.worldbank import country_market_context as worldbank_context
 
 router = APIRouter(tags=["collect"])
 
@@ -179,10 +181,11 @@ class MarketContextIn(BaseModel):
 def collect_market_context(
     sector_id: uuid.UUID, payload: MarketContextIn, db: Session = Depends(get_db)
 ) -> dict:
-    """World Bank macro context (population / GDP) for the sector's geography.
+    """Macro context (population / GDP) for the sector's geography.
 
-    If no country is given, infers it from the most common company HQ in the sector.
-    Persisted onto the sector so the Overview tab can show it.
+    Collects from World Bank (global) and Eurostat (EU-authoritative, for European
+    geographies). If no country is given, infers it from the most common company
+    HQ in the sector. Persisted onto the sector so the Overview tab can show it.
     """
     sector = db.get(Sector, sector_id)
     if sector is None:
@@ -193,14 +196,44 @@ def collect_market_context(
         geos = [c.geography for c in sector.companies if c.geography]
         country = Counter(geos).most_common(1)[0][0] if geos else None
 
-    ctx = country_market_context(country)
-    if not ctx:
+    worldbank = worldbank_context(country)
+    eurostat = eurostat_context(country)
+    if not worldbank and not eurostat:
         return {"found": False, "country": country}
 
     extra = dict(sector.synthesis_extra or {})
-    extra["marketContext"] = ctx
+    if worldbank:
+        extra["marketContext"] = worldbank
+    if eurostat:
+        extra["marketContextEu"] = eurostat
     sector.synthesis_extra = extra
     flag_modified(sector, "synthesis_extra")
     db.commit()
 
-    return {"found": True, "marketContext": ctx}
+    return {"found": True, "marketContext": worldbank, "marketContextEu": eurostat}
+
+
+@router.post("/companies/{company_id}/collect-edgar")
+def collect_edgar(company_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+    """SEC EDGAR full-text mention count for a company (a comparability signal).
+
+    Counts how many US public-company filings name the company, and persists the
+    signal into `extra.edgarMentions` (with a source for the trust model).
+    """
+    company = db.get(Company, company_id)
+    if company is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    collected = edgar_filing_mentions(company.name)
+    if not collected:
+        return {"found": False, "company": {"id": str(company.id), "name": company.name}}
+
+    extra = dict(company.extra or {})
+    extra["edgarMentions"] = collected["filingMentions"]
+    _append_source(extra, "edgarMentions", collected)
+    company.extra = extra
+    flag_modified(company, "extra")
+    db.commit()
+
+    return {"found": True, "collected": collected,
+            "company": {"id": str(company.id), "name": company.name}}

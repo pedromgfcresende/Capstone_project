@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { X, Pencil, ArrowRight, Users, Banknote, BarChart3, Sparkles } from 'lucide-react'
-import { getProfile, METRIC_LEVELS } from '../data/companyProfiles'
+import { X, Pencil, ArrowRight, Banknote, Sparkles } from 'lucide-react'
+import { getProfile } from '../data/companyProfiles'
 import { VerifyDot, VerifyLegend, useVerifyMap } from './VerifyDot'
 import { patchCompany } from '../api/client'
 
@@ -192,10 +192,10 @@ export default function CompanyProfile({ company, onClose, onEnterSegment, onSav
             </div>
           )}
 
-          {/* ── Funding (research context, when available) ── */}
-          {(base.latestRound || base.fundingHistory.length > 0 || base.investors.length > 0) && (
+          {/* ── Funding (latest round + investors, from the company record) ── */}
+          {(base.latestRound || base.investors.length > 0) && (
             <div>
-              <SectionLabel icon={Banknote}>Funding history</SectionLabel>
+              <SectionLabel icon={Banknote}>Funding</SectionLabel>
               <Card className="overflow-hidden">
                 {base.latestRound && (
                   <div className="px-5 py-4 border-b border-rule">
@@ -203,11 +203,10 @@ export default function CompanyProfile({ company, onClose, onEnterSegment, onSav
                     <div className="font-sans text-[14px] font-semibold text-ink mt-1">
                       {[base.latestRound.stage, base.latestRound.amount].filter(Boolean).join(' · ')}
                     </div>
-                    {base.latestRound.date && <div className="font-sans text-[11.5px] text-ink-mute mt-0.5">{base.latestRound.date}</div>}
                   </div>
                 )}
                 {base.investors.length > 0 && (
-                  <div className="px-5 py-4 border-b border-rule">
+                  <div className="px-5 py-4">
                     <span className="font-mono text-[8.5px] uppercase tracking-[0.12em] text-ink-mute">Key investors</span>
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {base.investors.map((inv, i) => (
@@ -216,68 +215,6 @@ export default function CompanyProfile({ company, onClose, onEnterSegment, onSav
                     </div>
                   </div>
                 )}
-                {base.fundingHistory.length > 0 && (
-                  <div className="px-5 py-4">
-                    <span className="font-mono text-[8.5px] uppercase tracking-[0.12em] text-ink-mute">History</span>
-                    <div className="flex flex-col mt-2 divide-y divide-rule">
-                      {base.fundingHistory.map((f, i) => (
-                        <div key={i} className="flex items-center gap-4 py-2.5">
-                          <span className="font-mono text-[10px] text-ink-mute w-[64px] shrink-0">{f.date}</span>
-                          <span className="font-serif text-[14px] font-semibold text-ink w-[64px] shrink-0">{f.amount}</span>
-                          <span className="font-sans text-[12px] text-ink-soft flex-1">{f.round}{f.lead ? ` · ${f.lead}` : ''}</span>
-                          {f.current && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: '#2d6a3f' }} />}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </Card>
-            </div>
-          )}
-
-          {/* ── Team ── */}
-          {base.team.length > 0 && (
-            <div>
-              <SectionLabel icon={Users}>Team &amp; leadership</SectionLabel>
-              <Card className="overflow-hidden divide-y divide-rule">
-                {base.team.map((p, i) => (
-                  <div key={i} className="px-5 py-4 flex gap-3.5">
-                    <div className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-serif text-[14px] text-ink-soft" style={{ background: '#d8d2c5' }}>
-                      {p.name.charAt(0)}
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="font-sans text-[13px] font-semibold text-ink">{p.name}</span>
-                      <span className="font-mono text-[8.5px] uppercase tracking-[0.1em] text-ink-mute">{p.role}</span>
-                      <p className="font-sans text-[12px] text-ink-soft leading-relaxed mt-0.5">{p.bio}</p>
-                    </div>
-                  </div>
-                ))}
-              </Card>
-            </div>
-          )}
-
-          {/* ── Core metrics ── */}
-          {base.metrics && (
-            <div className="pb-2">
-              <SectionLabel icon={BarChart3}>Core metrics</SectionLabel>
-              <Card className="overflow-hidden">
-                <div className="grid grid-cols-2">
-                  {Object.entries(base.metrics).map(([label, m], i) => {
-                    const lv = METRIC_LEVELS[m.level] || METRIC_LEVELS.Low
-                    return (
-                      <div key={label} className="px-5 py-4 border-rule" style={{ borderRightWidth: i % 2 === 0 ? 1 : 0, borderTopWidth: i >= 2 ? 1 : 0 }}>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="font-mono text-[8.5px] uppercase tracking-[0.1em] text-ink-mute">{label}</span>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-mono text-[8px] uppercase tracking-[0.06em] px-1.5 py-0.5 rounded" style={{ background: lv.bg, color: lv.text }}>{m.level}</span>
-                            <span className="w-2 h-2 rounded-full" style={{ background: lv.dot }} />
-                          </div>
-                        </div>
-                        <span className="font-serif text-[15px] font-semibold text-ink">{m.value}</span>
-                      </div>
-                    )
-                  })}
-                </div>
               </Card>
             </div>
           )}

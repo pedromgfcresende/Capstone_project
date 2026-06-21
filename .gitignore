@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Secrets / env (never commit keys — use .env.example as the template)
+.env
+.env.*
+!.env.example
+
 # Generated knowledge-graph artifacts (graphify)
 graphify-out/
 

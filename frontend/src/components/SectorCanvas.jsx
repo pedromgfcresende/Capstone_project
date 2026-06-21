@@ -1,24 +1,8 @@
 import { useState, useMemo, useEffect } from 'react'
-import { ArrowRight, Search, X, Sparkles, ChevronDown, ChevronUp, Send, Target, Radio, Layers, RefreshCw, Pencil, Trash2, AlertTriangle } from 'lucide-react'
-import { segmentOverview, FALLBACK_OVERVIEW } from '../data/segmentOverview'
+import { ArrowRight, Search, X, Sparkles, ChevronDown, ChevronUp, Send, Target, Layers, RefreshCw, Pencil, Trash2, AlertTriangle } from 'lucide-react'
 import CompanyProfile from './CompanyProfile'
 import { VerifyDot, VerifyLegend, useVerifyMap } from './VerifyDot'
 import { synthesizeSector, askSector, patchSector, enrichSector, deleteSector } from '../api/client'
-
-const SIGNAL_COLORS = {
-  'Funding':    { bg: '#d4edda', text: '#2d6a3f' },
-  'M&A':        { bg: '#e8e0f8', text: '#5a3d9a' },
-  'Regulatory': { bg: '#e9e7fb', text: '#c04a22' },
-  'Trend':      { bg: '#e8f0fe', text: '#2a5fd4' },
-  'Exit':       { bg: '#fff3cd', text: '#856404' },
-}
-
-const MOMENTUM = {
-  'Early Adopters': { label: 'Early · heating up', bg: '#d4edda', text: '#2d6a3f' },
-  'Early Majority': { label: 'Scaling',            bg: '#e8f0fe', text: '#2a5fd4' },
-  'Late Majority':  { label: 'Consolidating',      bg: '#fff3cd', text: '#856404' },
-  'Laggards':       { label: 'Mature',             bg: '#f0ede8', text: '#8a8580' },
-}
 
 // canonical consolidated funding stages (matches backend normalize_funding_stage)
 const ROUND_ORDER = ['Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Series D', 'Public', 'Acquired']
@@ -71,19 +55,6 @@ function consolidateSegments(rows) {
   })
   return groups.sort((a, b) => a.label.localeCompare(b.label))
 }
-const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
-const parseDate = (s) => {
-  if (!s) return 0
-  const [m, y] = s.toLowerCase().split(' ')
-  return parseInt(y || '0', 10) * 12 + (MONTHS.indexOf(m?.slice(0, 3)) + 1)
-}
-// crude TAM parse: "$8.2B" -> 8.2, "$420M" -> 0.42
-const parseTam = (s) => {
-  if (!s) return 0
-  const n = parseFloat(s.replace(/[^0-9.]/g, '')) || 0
-  return /b/i.test(s) ? n : /m/i.test(s) ? n / 1000 : n
-}
-
 // ── AI query (kept — synthesis Q&A across segments, not data ingestion) ───────
 function QueryResult({ result, query }) {
   const [expanded, setExpanded] = useState(false)
@@ -176,7 +147,6 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDele
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [profileCompany, setProfileCompany] = useState(null)
-  const signalVerify = useVerifyMap()
   const aiVerify = useVerifyMap()
 
   const workspaces = sector?.workspaces || []
@@ -204,30 +174,12 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDele
     return Object.entries(counts).sort((a, b) => b[1] - a[1])
   }, [allCompanies])
 
-  // Roll-up: signals timeline (regulatory + M&A from each segment overview)
-  const signals = useMemo(() => {
-    const out = []
-    workspaces.forEach(ws => {
-      const ov = segmentOverview[ws.id] || FALLBACK_OVERVIEW
-      ;(ov.regulatory || []).forEach(r => out.push({ type: 'Regulatory', date: r.date, label: r.label, note: r.note, segment: ws.title, wsId: ws.id }))
-      ;(ov.recentMA || []).forEach(m => out.push({ type: 'M&A', date: m.date, label: m.event, note: m.note, segment: ws.title, wsId: ws.id }))
-    })
-    // dedupe identical labels (same event surfaced by multiple segments)
-    const seen = new Set()
-    const deduped = out.filter(s => { const k = s.label; if (seen.has(k)) return false; seen.add(k); return true })
-    return deduped.sort((a, b) => parseDate(b.date) - parseDate(a.date))
-  }, [workspaces])
-
   // Segment comparison rows
   const segmentRows = useMemo(() =>
-    workspaces.map(ws => {
-      const ov = segmentOverview[ws.id] || FALLBACK_OVERVIEW
-      return {
-        id: ws.id, title: ws.title, focal: ws.focalCompany,
-        companies: (ws.companies || []).length,
-        tam: ov.tam, cagr: ov.cagr, stage: ov.adoptionStage || ov.maturity,
-      }
-    }).sort((a, b) => a.title.localeCompare(b.title)),
+    workspaces.map(ws => ({
+      id: ws.id, title: ws.title, focal: ws.focalCompany,
+      companies: (ws.companies || []).length,
+    })).sort((a, b) => a.title.localeCompare(b.title)),
     [workspaces]
   )
 
@@ -241,7 +193,6 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDele
         title: g.label,
         focal: g.rows.find(r => r.focal)?.focal || null,
         companies: g.rows.reduce((s, r) => s + r.companies, 0),
-        tam: primary.tam, cagr: primary.cagr, stage: primary.stage,
         merged: g.rows.length > 1 ? g.rows.map(r => r.title) : null,
       }
     })
@@ -249,16 +200,6 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDele
 
   const derivedHeadline = sector?.synthesisHeadline || ''
   const derivedBody = sector?.synthesisBody || ''
-
-  // Maturity gradient — where each segment sits on the adoption curve (derived, read-only)
-  const STAGE_POS = { 'Early Adopters': 14, 'Early Majority': 42, 'Late Majority': 70, 'Laggards': 90 }
-  const maturity = useMemo(() =>
-    workspaces.map(ws => {
-      const stage = (segmentOverview[ws.id] || FALLBACK_OVERVIEW).adoptionStage
-      return { id: ws.id, title: ws.title, stage, pos: STAGE_POS[stage] ?? 30 }
-    }).filter(m => m.stage).sort((a, b) => a.pos - b.pos),
-    [workspaces]
-  )
 
   // Editable synthesis state — seeded from the roll-up, re-seeded on sector change or re-synthesise.
   const [headline, setHeadline] = useState(derivedHeadline)
@@ -562,38 +503,6 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDele
                     className="font-sans text-[13px] text-ink-soft leading-relaxed" />
                 </div>
 
-                {/* Maturity gradient across segments */}
-                {maturity.length > 0 && (
-                  <div className="px-6 pb-5 pt-1">
-                    <span className="font-mono text-[8.5px] uppercase tracking-[0.12em] text-ink-mute">Maturity across segments</span>
-                    <div className="mt-4 mb-2 relative">
-                      {/* track */}
-                      <div className="relative h-1.5 rounded-full" style={{ background: 'linear-gradient(to right, #e8e0d4, #6a5cd6)' }}>
-                        {maturity.map((m) => (
-                          <div key={m.id} className="absolute -translate-x-1/2" style={{ left: `${m.pos}%`, top: -3 }}>
-                            <div className="w-3 h-3 rounded-full bg-white border-2 shadow-sm" style={{ borderColor: '#15063b' }} title={`${m.title} · ${m.stage}`} />
-                          </div>
-                        ))}
-                      </div>
-                      {/* stage axis labels */}
-                      <div className="flex justify-between mt-2 font-mono text-[8px] uppercase tracking-[0.06em] text-ink-mute">
-                        <span>Early adopters</span><span>Early majority</span><span>Late majority</span><span>Laggards</span>
-                      </div>
-                    </div>
-                    {/* legend */}
-                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
-                      {maturity.map(m => (
-                        <button key={m.id} onClick={() => onSelect({ type: 'workspace', id: m.id, sectorId: sector.id })}
-                          className="flex items-center gap-1.5 bg-transparent border-0 cursor-pointer group p-0">
-                          <span className="w-2 h-2 rounded-full bg-ink shrink-0" />
-                          <span className="font-sans text-[11.5px] text-ink-soft group-hover:text-ink transition-colors">{m.title}</span>
-                          <span className="font-mono text-[9px] text-ink-mute">· {m.stage}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
               </div>
             </div>
 
@@ -621,14 +530,14 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDele
                 </div>
               ) : (
                 <div className="bg-white border border-rule rounded-lg overflow-hidden">
-                  <div className="grid items-center px-4 py-2 border-b border-rule bg-bg" style={{ gridTemplateColumns: '1fr 70px 80px 150px 110px' }}>
-                    {['Segment', 'Cos', 'TAM', 'CAGR', ''].map((h, i) => (
+                  <div className="grid items-center px-4 py-2 border-b border-rule bg-bg" style={{ gridTemplateColumns: '1fr 70px 110px' }}>
+                    {['Segment', 'Cos', ''].map((h, i) => (
                       <span key={i} className="font-mono text-[8.5px] uppercase tracking-[0.1em] text-ink-mute">{h}</span>
                     ))}
                   </div>
                   {(groupSegs ? consolidatedGroups : segmentRows).map(row => {
                     return (
-                      <div key={row.id} className="grid items-center px-4 py-3.5 border-b border-rule last:border-b-0 hover:bg-bg transition-colors" style={{ gridTemplateColumns: '1fr 70px 80px 150px 110px' }}>
+                      <div key={row.id} className="grid items-center px-4 py-3.5 border-b border-rule last:border-b-0 hover:bg-bg transition-colors" style={{ gridTemplateColumns: '1fr 70px 110px' }}>
                         <div className="flex flex-col gap-0.5 min-w-0 pr-3">
                           <span className="font-sans text-[13px] font-semibold text-ink truncate">{row.title}</span>
                           {row.merged
@@ -636,8 +545,6 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDele
                             : row.focal && <span className="font-sans text-[11px] text-ink-mute truncate">Focal · {row.focal}</span>}
                         </div>
                         <span className="font-sans text-[12.5px] text-ink-soft">{row.companies}</span>
-                        <span className="font-sans text-[13px] font-semibold text-ink">{row.tam || '—'}</span>
-                        <span className="font-mono text-[11px] text-ink-soft">{row.cagr || '—'}</span>
                         <button
                           onClick={() => onSelect({ type: 'workspace', id: row.id, sectorId: sector.id })}
                           className="flex items-center gap-1.5 font-sans text-[11.5px] font-medium px-3 py-1.5 rounded-md bg-ink text-white border-0 cursor-pointer transition-all w-fit justify-self-end"
@@ -768,46 +675,6 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDele
                 </div>
               )
             })()}
-
-            {/* ── Signals timeline (roll-up) ── */}
-            {signals.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <SectionHeader icon={Radio} label="Signals & Activity" count={`${signals.length} events`} />
-                  <div className="mb-3"><VerifyLegend /></div>
-                </div>
-                <div className="flex flex-col overflow-y-auto pr-1" style={{ maxHeight: 320 }}>
-                  {signals.map((s, i, arr) => {
-                    const colors = SIGNAL_COLORS[s.type] || { bg: '#f0ede8', text: '#6a6560' }
-                    return (
-                      <div key={i} className="flex gap-4">
-                        <div className="flex flex-col items-center" style={{ width: 28 }}>
-                          <div className="w-2 h-2 rounded-full border-2 mt-4 shrink-0" style={{ borderColor: colors.text, background: colors.bg }} />
-                          {i < arr.length - 1 && <div className="flex-1 w-px bg-rule mt-1" />}
-                        </div>
-                        <div
-                          onClick={() => onSelect({ type: 'workspace', id: s.wsId, sectorId: sector.id })}
-                          className="flex-1 pb-5 text-left cursor-pointer group"
-                          title={`Open ${s.segment} →`}
-                        >
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <VerifyDot status={signalVerify.get(i)} onClick={(e) => { e.stopPropagation(); signalVerify.cycle(i) }} />
-                            <span className="font-mono text-[9px] text-ink-mute shrink-0">{s.date}</span>
-                            <span className="font-mono text-[8px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded shrink-0" style={{ background: colors.bg, color: colors.text }}>{s.type}</span>
-                            <span className="font-sans text-[12.5px] font-medium text-ink flex-1 group-hover:text-accent transition-colors">{s.label}</span>
-                            <span className="flex items-center gap-1 shrink-0">
-                              <span className="font-mono text-[8px] uppercase tracking-[0.05em] text-ink-mute group-hover:text-ink transition-colors">{s.segment}</span>
-                              <ArrowRight size={10} className="text-ink-mute opacity-0 group-hover:opacity-70 transition-opacity" />
-                            </span>
-                          </div>
-                          <p className="font-sans text-[12px] text-ink-soft leading-relaxed">{s.note}</p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* ── Ask across segments (synthesis Q&A) ── */}
             <div className="pb-4">

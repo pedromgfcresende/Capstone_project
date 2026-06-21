@@ -123,7 +123,7 @@ edge("uploads", 1, "sectors", FK, rad=-0.2, label="N:1")
 edge("segments", 6, "uploads", FK, dashed=True, rad=-0.35, label="soft")
 edge("verifications", 2, "segment_synthesis", FK, dashed=True, rad=-0.3, label="polymorphic")
 
-ax.text(0.4, 20.2, "XAnge Market Intelligence — Postgres schema (M2)", fontsize=20, fontweight="bold", color=INK)
+ax.text(0.4, 20.2, "XAnge Market Intelligence — Postgres schema", fontsize=20, fontweight="bold", color=INK)
 ax.text(0.4, 19.75, "sectors → segments → companies, linked many-to-many via company_segments (a company can compete in several segments)", fontsize=11, color=SOFT)
 ax.text(12.9, 19.75, "CRM / pipeline — separate domain", fontsize=11, color=SOFT, fontweight="bold")
 ax.text(12.9, 9.0, "M2: companies.origin (csv|crm|ai) + crm_company_id\nlink AI-found competitors back to the CRM.\nai_enrichment logs each market-research run.", fontsize=9.5, color=MUTE, style="italic", va="top")

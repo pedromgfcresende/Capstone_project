@@ -1,0 +1,52 @@
+# XAnge Market Intelligence — full stack (db + backend + frontend).
+# Usage:  cp .env.example .env  &&  docker compose up --build -d
+# Then open http://localhost:8080
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: xange
+      POSTGRES_PASSWORD: xange
+      POSTGRES_DB: xange
+    volumes:
+      - xange_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xange -d xange"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://xange:xange@db:5432/xange
+      CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+      # LLM + research + collectors — interpolated from the root .env (all optional).
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      LLM_MODEL: ${LLM_MODEL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      COMPANIES_HOUSE_API_KEY: ${COMPANIES_HOUSE_API_KEY:-}
+      # Optional: where the CRM CSVs live (mount it below to seed real data).
+      CRM_DATA_DIR: ${CRM_DATA_DIR:-/data}
+    # To seed real CRM data, mount the export folder and run the seed once:
+    #   docker compose run --rm -v /abs/path/to/data:/data backend uv run python -m scripts.seed
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  xange_pgdata:

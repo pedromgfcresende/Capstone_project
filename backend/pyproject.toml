@@ -27,6 +27,7 @@ dev = [
     "pytest>=8.3",
     "httpx>=0.27",
     "ruff>=0.7",
+    "matplotlib>=3.9",   # diagram generators (scripts/make_*_png.py)
 ]
 
 [tool.ruff]
