@@ -41,10 +41,10 @@ class RegItem(BaseModel):
 
 
 class Market(BaseModel):
-    tam: str = Field(description="estimated total addressable market, e.g. '$8B' (best-effort)")
-    sam: str = Field(description="estimated serviceable addressable market")
-    som: str = Field(description="estimated obtainable market near-term")
-    cagr: str = Field(description="estimated market CAGR, e.g. '~25% CAGR'")
+    tam: str = Field(description="estimated total addressable market — value only, e.g. '$8B'. No parenthetical descriptions.")
+    sam: str = Field(description="estimated serviceable addressable market — value only, e.g. '$2B'. No parentheticals.")
+    som: str = Field(description="estimated obtainable market near-term — value only, e.g. '$300M'. No parentheticals.")
+    cagr: str = Field(description="estimated market CAGR — short value only, e.g. '~25% CAGR' or '~25–35% CAGR'. No parenthetical category descriptions.")
     adoption_stage: str = Field(
         description="one of: Early Adopters | Early Majority | Late Majority | Laggards"
     )

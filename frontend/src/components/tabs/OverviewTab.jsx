@@ -3,6 +3,14 @@ import { ChevronDown, ChevronUp, ArrowUpRight } from 'lucide-react'
 import { FALLBACK_OVERVIEW } from '../../data/segmentOverview'
 import { VerifyDot, VerifyLegend, useVerifyMap } from '../VerifyDot'
 
+// Market figures sometimes arrive with a trailing parenthetical category
+// description ("~25-35% CAGR (AI customer service ... platforms)") — keep the
+// value, drop the run-on so it renders cleanly in the small metric slots.
+function cleanMetric(s) {
+  if (!s) return s
+  return String(s).replace(/\s*\([^)]*\)?/g, '').replace(/\s+/g, ' ').trim()
+}
+
 // Map the AI synthesis market block (snake_case) onto the tab's shape.
 function marketToOverview(workspace) {
   const syn = workspace.synthesis
@@ -11,7 +19,7 @@ function marketToOverview(workspace) {
   return {
     ...FALLBACK_OVERVIEW,
     thesis: syn.overview.text || '',
-    tam: m.tam, sam: m.sam, som: m.som, cagr: m.cagr,
+    tam: cleanMetric(m.tam), sam: cleanMetric(m.sam), som: cleanMetric(m.som), cagr: cleanMetric(m.cagr),
     adoptionStage: m.adoption_stage,
     adoptionEvidence: m.adoption_evidence,
     tailwinds: m.tailwinds || [],
