@@ -744,11 +744,16 @@ export default function SectorCanvas({ sector, onSelect, onSectorUpdated, onDele
                           {c.sources?.length > 0 && (
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                               <span className="font-mono text-[8px] uppercase tracking-[0.08em] text-ink-mute">sources</span>
-                              {c.sources.slice(0, 4).map((u, i) => (
-                                <a key={i} href={u} target="_blank" rel="noreferrer" className="font-mono text-[9px] text-accent-deep hover:underline truncate max-w-[160px]">
-                                  {u.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
-                                </a>
-                              ))}
+                              {c.sources.slice(0, 4).map((s, i) => {
+                                // sources may be plain URL strings or {url, name} objects
+                                const u = typeof s === 'string' ? s : (s?.url || '')
+                                if (!u) return null
+                                return (
+                                  <a key={i} href={u} target="_blank" rel="noreferrer" className="font-mono text-[9px] text-accent-deep hover:underline truncate max-w-[160px]">
+                                    {u.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
+                                  </a>
+                                )
+                              })}
                             </div>
                           )}
                         </div>
